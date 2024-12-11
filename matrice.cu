@@ -75,6 +75,7 @@ void dot_par(matrice* A,matrice* B,matrice* C){
     if(A->colonnes != B->lignes || C->lignes != A->lignes || C->colonnes != B->colonnes){
         printf("produit matrice incompatible");
     }
+    //TODO verifier
     dim3 blockDim(16, 16);
     dim3 gridDim(C->colonnes / blockDim.x, C->lignes / blockDim.y);
     cuda_dot<<<gridDim, blockDim>>>(A->data,A->lignes,A->colonnes, B->data,B->lignes,B->colonnes, C->data,C->lignes,C->colonnes);
