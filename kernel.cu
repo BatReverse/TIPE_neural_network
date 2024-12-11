@@ -1,0 +1,43 @@
+#include"matrice.h"
+#include"stdio.h"
+#define CHECK_CUDA(call) \
+    if ((call) != cudaSuccess) { \
+        printf("CUDA Error at %s:%d\n", __FILE__, __LINE__); \
+        return; \
+    }
+
+__global__ void cuda_dot(double* A,int ligne_A,int colonnes_A,double* B,int ligne_B,int colonnes_B,double* C,int ligne_C,int colonnes_C) {
+    int ligne = blockIdx.y * blockDim.y + threadIdx.y;
+    int colonne = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (ligne < ligne_C && colonne < colonnes_C) {
+        for (int i = 0; i < ligne_B; i++)
+        {
+            C[ligne*colonnes_C+colonne] += A[ligne*colonnes_A+i]*B[i*colonnes_B+colonne];
+        }
+        
+    }
+}
+
+__global__ void cuda_hadamard(double* A,double* B,double* C,int lignes,int colonnes){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<lignes*colonnes)
+        C[i] = A[i] * B[i];
+}
+__global__ void cuda_sum(double* A,double* B,double* C,int lignes,int colonnes){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<lignes*colonnes)
+        C[i] = A[i] + B[i];
+}
+__global__ void cuda_diff(double* A,double* B,double* C,int lignes,int colonnes){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<lignes*colonnes)
+        C[i] = A[i] - B[i];
+}
+
+__global__ void cuda_transpose(double* A,double* C,int lignes_A,int colonnes_A){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    if(i<lignes_A && j<colonnes_A)
+        C[j*lignes_A+i] =A[i*colonnes_A+j];
+}
