@@ -1,5 +1,6 @@
 #include"matrice.h"
 #include"stdio.h"
+
 #define CHECK_CUDA(call) \
     if ((call) != cudaSuccess) { \
         printf("CUDA Error at %s:%d\n", __FILE__, __LINE__); \
@@ -41,3 +42,46 @@ __global__ void cuda_transpose(double* A,double* C,int lignes_A,int colonnes_A){
     if(i<lignes_A && j<colonnes_A)
         C[j*lignes_A+i] =A[i*colonnes_A+j];
 }
+
+__global__ void cuda_RELU(double* A,double* C,int taille){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<taille){
+        if (A[i]>0) 
+            C[i] = A[i];
+        else 
+            C[i] = 0;    
+    }
+}
+
+__global__ void cuda_RELU_d(double* A,double* C,int taille){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<taille){
+        if(A[i]>0)
+            C[i] = 1;
+        else 
+            C[i] = 0;    
+    }
+}
+
+__global__ void cuda_sigmoid(double* A,double* C,int taille){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<taille){
+        C[i] = 1/(1+exp(-A[i]));    
+    }
+}
+
+__global__ void cuda_sigmoid_d(double* A,double* C,int taille){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<taille){
+        double sig= 1/(1+exp(-A[i]));
+        C[i] = sig*(1-sig);    
+    }
+}
+
+__global__ void cuda_softmax(double* A,double* C,int taille,double e){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<taille){
+        C[i] = exp(A[i])/e;
+    }
+}
+

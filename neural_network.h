@@ -2,6 +2,7 @@
 #define NEURAL_NETWORK
 
 #include"matrice.h"
+//TODO faire tout
 struct neural_network
 {
     int nombre_couche;
@@ -31,8 +32,6 @@ neural_network* cree_reseau();
 void propagation_avant(neural_network* reseau,matrice* nourriture);
 void propagation_arriere(neural_network* reseau,matrice* obj);
 
-result resultat(neural_network* reseau){
-    
-}
+result obtenir_resultat(neural_network* reseau);
 
 #endif
