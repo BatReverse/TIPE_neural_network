@@ -164,7 +164,8 @@ if(A->colonnes != B->colonnes || A->lignes != B->lignes ||
     if (err != cudaSuccess) {
         printf("CUDA error after synchronization: %s\n", cudaGetErrorString(err));
         return ;
-    }}
+    }
+}
 
 
 void diff(matrice* A,matrice* B,matrice* C){
@@ -236,13 +237,8 @@ matrice* transpose(matrice* A) {
     return res;
 }
 
-matrice* copy(matrice* A){
-    matrice* res=(matrice*)malloc(sizeof(matrice));
-    res->colonnes = A->colonnes;
-    res->lignes = A->lignes;
-    cudaMalloc(&(res->data), sizeof(double) * A->colonnes * A->lignes);
-    cudaMemcpy(res->data,A->data,sizeof(double) * A->colonnes * A->lignes,cudaMemcpyDeviceToDevice);
-    return res;
+void copy(matrice* A,matrice* C){
+    //TODO
 }
 
 void mat_RELU(matrice* A,matrice* C){
@@ -404,6 +400,38 @@ void mat_SOFT_MAX(matrice* A,matrice* C){
         return ;
     }
 }
-void mat_SOFT_MAX_d(matrice*A,matrice* C){
 
+void mat_SOFT_MAX_d(matrice*A,matrice* C){
+    
+}
+
+void dCOST(matrice* A,matrice* obj,matrice* C){
+    if(A->colonnes != obj->colonnes || A->lignes != obj->lignes ||
+       A->colonnes != C->colonnes || A->lignes != C->lignes){
+        printf("sum invalide");
+        exit(EXIT_FAILURE);
+    }
+    dim3 blockDim(16);
+    dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
+
+    if (gridDim.x == 0 ||  blockDim.x == 0 ) {
+        printf("Erreur : Dimensions de la grille ou du bloc invalides.\n");
+        return ;
+    }
+
+    cudaError_t err = cudaGetLastError();
+    cuda_dcost<<<gridDim,blockDim>>>(A->data,obj->data,C->data,A->lignes,A->colonnes);
+    
+    // Vérifiez les erreurs CUDA après le lancement du kernel
+    if (err != cudaSuccess) {
+        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        return ;
+    }
+
+    // Synchronisation de l'appareil pour s'assurer que l'exécution a réussi
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        printf("CUDA error after synchronization: %s\n", cudaGetErrorString(err));
+        return ;
+    }
 }

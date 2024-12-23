@@ -1,11 +1,11 @@
 #include"matrice.h"
 #include"stdio.h"
 
-#define CHECK_CUDA(call) \
-    if ((call) != cudaSuccess) { \
-        printf("CUDA Error at %s:%d\n", __FILE__, __LINE__); \
-        return; \
-    }
+__global__ void cuda_dcost(double* A,double* obj,double* C,int lignes,int colonnes){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<lignes*colonnes)
+        C[i] = 2*(A[i] - obj[i]);
+}
 
 __global__ void cuda_dot(double* A,int ligne_A,int colonnes_A,double* B,int ligne_B,int colonnes_B,double* C,int ligne_C,int colonnes_C) {
     int ligne = blockIdx.y * blockDim.y + threadIdx.y;

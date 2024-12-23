@@ -2,10 +2,18 @@
 #define NEURAL_NETWORK
 
 #include"matrice.h"
+#include <stdarg.h>
 //TODO faire tout
+
+//1 RELU, 2 sigmoid, 3 softmax
+#define MIDLAYER 1
+#define OUTPUTLAYER 2
+
 struct neural_network
 {
     int nombre_couche;
+    int* neuronnes_parcouche;
+
     matrice** neuronnes_somme;
     matrice** neuronnes_activ;
 
@@ -13,6 +21,7 @@ struct neural_network
     matrice** biais;
 
     matrice** dpoids;
+    matrice** dbiais;
     matrice** dneuronnes;
 
     double vitesse_apprentissage;
@@ -26,8 +35,7 @@ struct result
 };
 typedef struct result result;
 
-//TODO mettre les bons arguments
-neural_network* cree_reseau();
+neural_network* cree_reseau(int nb_couche, ...);
 
 void propagation_avant(neural_network* reseau,matrice* nourriture);
 void propagation_arriere(neural_network* reseau,matrice* obj);
