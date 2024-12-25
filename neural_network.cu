@@ -110,7 +110,7 @@ void propagation_avant(neural_network* reseau,matrice* nourriture){
 }
 
 void maj_reseau(neural_network* reseau){
-
+    
 }
 
 void propagation_arriere(neural_network* reseau,matrice* obj){

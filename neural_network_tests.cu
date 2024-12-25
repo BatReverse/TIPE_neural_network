@@ -2,6 +2,117 @@
 #include"matrice.h"
 #include<stdio.h>
 
-void XOR(){
-    matrice** obj =
+matrice** creationressources_xor(){
+    matrice** ressources = (matrice**)malloc(sizeof(matrice*)*4);
+
+    matrice* un = (matrice*)malloc(sizeof(matrice));
+    matrice* deux = (matrice*)malloc(sizeof(matrice));
+    matrice* trois = (matrice*)malloc(sizeof(matrice));
+    matrice* quatre = (matrice*)malloc(sizeof(matrice));
+
+    un->lignes = 2;
+    un->colonnes =1;
+
+    deux->lignes = 2;
+    deux->colonnes =1;
+    
+    trois->lignes = 2;
+    trois->colonnes =1;
+    
+    quatre->lignes = 2;
+    quatre->colonnes =1;
+
+
+    cudaMalloc(&(un->data), sizeof(double) * 2);
+    cudaMalloc(&(deux->data), sizeof(double) * 2);
+    cudaMalloc(&(trois->data), sizeof(double) * 2);
+    cudaMalloc(&(quatre->data), sizeof(double) * 2);
+    
+    double* un_h = (double*)malloc(sizeof(double)*2);
+    double* deux_h = (double*)malloc(sizeof(double)*2);
+    double* trois_h = (double*)malloc(sizeof(double)*2);
+    double* quatre_h = (double*)malloc(sizeof(double)*2);
+
+    un_h[0] = 0;
+    un_h[1] = 0;
+
+    deux_h[0] = 1;
+    deux_h[1] = 1;
+
+    trois_h[0] = 0;
+    trois_h[1] = 1;
+
+    quatre_h[0] = 1;
+    quatre_h[1] = 0;
+
+    cudaMemcpy(un->data,un_h,sizeof(double)*2,cudaMemcpyHostToDevice);
+    cudaMemcpy(deux->data,deux_h,sizeof(double)*2,cudaMemcpyHostToDevice);
+    cudaMemcpy(trois->data,trois_h,sizeof(double)*2,cudaMemcpyHostToDevice);
+    cudaMemcpy(quatre->data,quatre_h,sizeof(double)*2,cudaMemcpyHostToDevice);
+
+    ressources[0] = un;
+    ressources[1] = deux;
+    ressources[2] = trois;
+    ressources[3] = quatre;
+
+    return ressources;
+}
+
+
+matrice** creationtests_xor(){
+    matrice** tests = (matrice**)malloc(sizeof(matrice*)*4);
+
+    matrice* un = (matrice*)malloc(sizeof(matrice));
+    matrice* zero = (matrice*)malloc(sizeof(matrice));
+
+    zero->lignes=1;
+    zero->colonnes=1;
+
+    un->lignes=1;
+    un->colonnes=1;
+
+    cudaMalloc(&(zero->data), sizeof(double));
+    cudaMalloc(&(un->data), sizeof(double));
+    
+    double* zero_h = (double*)malloc(sizeof(double));
+    double* un_h = (double*)malloc(sizeof(double));
+
+    zero_h[0]=0;
+    un_h[0]=0;
+
+    cudaMemcpy(zero->data,zero,sizeof(double),cudaMemcpyHostToDevice);
+    cudaMemcpy(un->data,un_h,sizeof(double),cudaMemcpyHostToDevice);
+    
+    tests[0]=zero;
+    tests[1]=zero;
+    tests[2]=un;
+    tests[3]=un;
+
+    return tests;
+}
+
+void test_xor(){
+    neural_network* reseau = cree_reseau(3,2,3,1);
+
+    matrice** ressources = creationressources_xor();
+    matrice** test= creationtests_xor();
+
+    for(int i=0;i<10000;i++){
+        int k = rand()%4;
+
+        propagation_avant(reseau,ressources[k]);
+        propagation_arriere(reseau,test[k]);
+    }
+
+    double sum=0;
+    for(int i=0;i<4;i++){
+        propagation_avant(reseau,ressources[i]);
+        result r = obtenir_resultat(reseau);
+        if(i == 0 || i== 1){
+            sum+=r.valeur*r.valeur;
+        }else{
+            sum+=(r.valeur-1)*(r.valeur-1);
+        }
+    }
+    printf("MSE: %ld\n",sum);
 }

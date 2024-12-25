@@ -435,3 +435,29 @@ void dCOST(matrice* A,matrice* obj,matrice* C){
         return ;
     }
 }
+
+void multiply(matrice* A,double lambda){
+    dim3 blockDim(16);
+    dim3 gridDim((A->colonnes*A->lignes+blockDim.x - 1)/blockDim.x);
+
+    if (gridDim.x == 0 ||  blockDim.x == 0 ) {
+        printf("Erreur : Dimensions de la grille ou du bloc invalides.\n");
+        return ;
+    }
+    cudaError_t err = cudaGetLastError();
+    cuda_multiply<<<gridDim,blockDim>>>(A->data,A->lignes*A->colonnes,lambda);
+    
+
+    // Vérifiez les erreurs CUDA après le lancement du kernel
+    if (err != cudaSuccess) {
+        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        return ;
+    }
+
+    // Synchronisation de l'appareil pour s'assurer que l'exécution a réussi
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        printf("CUDA error after synchronization: %s\n", cudaGetErrorString(err));
+        return ;
+    }
+}

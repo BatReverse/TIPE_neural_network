@@ -85,3 +85,6 @@ __global__ void cuda_softmax(double* A,double* C,int taille,double e){
     }
 }
 
+__global__ void cuda_multiply(double* A,int taille, double lambda){
+    
+}

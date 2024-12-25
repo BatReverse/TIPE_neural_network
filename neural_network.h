@@ -42,4 +42,5 @@ void propagation_arriere(neural_network* reseau,matrice* obj);
 
 result obtenir_resultat(neural_network* reseau);
 
+
 #endif

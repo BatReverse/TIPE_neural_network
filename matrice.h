@@ -36,7 +36,8 @@ void mat_SOFT_MAX(matrice* A,matrice* C);
 //TODO faire
 void mat_SOFT_MAX_d(matrice*A,matrice* C);
 
+//TODO 
 void dCOST(matrice* A,matrice* obj, matrice* C);
-
+void multiply(double lambda,matrice* A);
 
 #endif
