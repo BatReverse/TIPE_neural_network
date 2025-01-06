@@ -59,37 +59,41 @@ matrice** creationressources_xor(){
 }
 
 
-matrice** creationtests_xor(){
-    matrice** tests = (matrice**)malloc(sizeof(matrice*)*4);
+matrice** creationtests_xor() {
+    matrice** tests = (matrice**)malloc(sizeof(matrice*) * 4);
 
-    matrice* un = (matrice*)malloc(sizeof(matrice));
     matrice* zero = (matrice*)malloc(sizeof(matrice));
+    matrice* un = (matrice*)malloc(sizeof(matrice));
 
-    zero->lignes=1;
-    zero->colonnes=1;
+    zero->lignes = 1;
+    zero->colonnes = 1;
 
-    un->lignes=1;
-    un->colonnes=1;
+    un->lignes = 1;
+    un->colonnes = 1;
 
     cudaMalloc(&(zero->data), sizeof(double));
     cudaMalloc(&(un->data), sizeof(double));
-    
+
     double* zero_h = (double*)malloc(sizeof(double));
     double* un_h = (double*)malloc(sizeof(double));
 
-    zero_h[0]=0;
-    un_h[0]=0;
+    zero_h[0] = 0; // Sortie XOR pour [0,0] et [1,1]
+    un_h[0] = 1;   // Sortie XOR pour [0,1] et [1,0]
 
-    cudaMemcpy(zero->data,zero,sizeof(double),cudaMemcpyHostToDevice);
-    cudaMemcpy(un->data,un_h,sizeof(double),cudaMemcpyHostToDevice);
-    
-    tests[0]=zero;
-    tests[1]=zero;
-    tests[2]=un;
-    tests[3]=un;
+    cudaMemcpy(zero->data, zero_h, sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(un->data, un_h, sizeof(double), cudaMemcpyHostToDevice);
+
+    tests[0] = zero;  // Correspond à [0,0]
+    tests[1] = zero;  // Correspond à [1,1]
+    tests[2] = un;    // Correspond à [0,1]
+    tests[3] = un;    // Correspond à [1,0]
+
+    free(zero_h); // Libérer les données hôte
+    free(un_h);
 
     return tests;
 }
+
 
 void test_xor(){
     neural_network* reseau = cree_reseau(3,2,3,1);
@@ -97,22 +101,29 @@ void test_xor(){
     matrice** ressources = creationressources_xor();
     matrice** test= creationtests_xor();
 
-    for(int i=0;i<10000;i++){
+    for(int i=0;i<100000;i++){
         int k = rand()%4;
 
         propagation_avant(reseau,ressources[k]);
+        // transpose(reseau->poids[reseau->nombre_couche-2]);
         propagation_arriere(reseau,test[k]);
-    }
-
-    double sum=0;
-    for(int i=0;i<4;i++){
-        propagation_avant(reseau,ressources[i]);
-        result r = obtenir_resultat(reseau);
-        if(i == 0 || i== 1){
-            sum+=r.valeur*r.valeur;
-        }else{
-            sum+=(r.valeur-1)*(r.valeur-1);
+        if(i%1000 == 0){
+            printf("i: %d\n",i);
+            double sum=0;
+            for(int i=0;i<4;i++){
+                propagation_avant(reseau,ressources[i]);
+                result r = obtenir_resultat(reseau);
+                if(i == 0 || i== 1){
+                    sum+=r.valeur*r.valeur;
+                }else{
+                    sum+=(r.valeur-1)*(r.valeur-1);
+                }
+            }
+            print_mat(reseau->poids[reseau->nombre_couche-2]);
+            print_mat(reseau->dpoids[reseau->nombre_couche-2]);
+            print_mat(reseau->poids[0]);
+            printf("MSE: %lf\n",sum/4.0);
         }
+        // printf("i: %d \n",i);
     }
-    printf("MSE: %ld\n",sum);
 }

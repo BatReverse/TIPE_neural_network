@@ -38,7 +38,7 @@ matrice* random_mat(int lignes, int colonnes, double x) {
     double* host_data = (double*)malloc(sizeof(double) * lignes * colonnes);
 
     for (int i = 0; i < lignes * colonnes; i++) {
-        host_data[i] = ((double)rand() / RAND_MAX) * 2.0 * x - x; // Générer un nombre entre -x et x
+        host_data[i] = ((double)rand() / RAND_MAX) * 1.0 * x ; // Générer un nombre entre -x et x
     }
 
     // Copier les données générées du CPU vers le GPU
@@ -72,17 +72,21 @@ void print_mat(matrice* mat_device) {
 }
 
 void dot_par(matrice* A,matrice* B,matrice* C){
-    if(A->colonnes != B->lignes || C->lignes != A->lignes || C->colonnes != B->colonnes){
-        printf("produit matrice incompatible");
+    if (A->colonnes != B->lignes || C->lignes != A->lignes || C->colonnes != B->colonnes) {
+       printf("Erreur : Dimensions incompatibles pour le produit matriciel (A: %dx%d, B: %dx%d, C: %dx%d).\n",
+       A->lignes, A->colonnes, B->lignes, B->colonnes, C->lignes, C->colonnes);
+        exit(EXIT_FAILURE);
     }
     
     //TODO verifier
+
     dim3 blockDim(16, 16);
-    dim3 gridDim(C->colonnes / blockDim.x, C->lignes / blockDim.y);
+    dim3 gridDim((C->colonnes + blockDim.x - 1) / blockDim.x, (C->lignes + blockDim.y - 1) / blockDim.y);
+
 
     
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
-        printf("Erreur : Dimensions de la grille ou du bloc invalides.\n");
+        printf("Erreur : dot par Dimensions de la grille ou du bloc invalides.\n");
         return ;
     }
 
@@ -101,14 +105,12 @@ void dot_par(matrice* A,matrice* B,matrice* C){
         printf("CUDA error after synchronization: %s\n", cudaGetErrorString(err));
         return ;
     }
-
-
 }
 
 void hadamar(matrice* A,matrice* B,matrice *C){
     if(A->colonnes != B->colonnes || A->lignes != B->lignes ||
        A->colonnes != C->colonnes || A->lignes != C->lignes){
-        printf("sum invalide");
+        printf("hadamar invalide");
         exit(EXIT_FAILURE);
     }
     dim3 blockDim(16);
@@ -172,7 +174,7 @@ void diff(matrice* A,matrice* B,matrice* C){
 
     if(A->colonnes != B->colonnes || A->lignes != B->lignes ||
        A->colonnes != C->colonnes || A->lignes != C->lignes){
-        printf("sum invalide");
+        printf("diff invalide");
         exit(EXIT_FAILURE);
     }
     dim3 blockDim(16);
@@ -201,44 +203,44 @@ void diff(matrice* A,matrice* B,matrice* C){
 }
 
 matrice* transpose(matrice* A) {
-    // Créer une nouvelle matrice pour la transposition (dimensions inversées)
     matrice* res = zeros(A->colonnes, A->lignes);
 
-    // Définir les dimensions du bloc et de la grille
-    dim3 blockDim(16, 16);  // Taille du bloc 16x16, à ajuster selon votre GPU
-    dim3 gridDim((A->colonnes + blockDim.x - 1) / blockDim.x, 
+    dim3 blockDim(16, 16);
+    dim3 gridDim((A->colonnes + blockDim.x - 1) / blockDim.x,
                  (A->lignes + blockDim.y - 1) / blockDim.y);
 
-    // Vérifiez que les dimensions sont valides
-    if (gridDim.x == 0 || gridDim.y == 0 || blockDim.x == 0 || blockDim.y == 0) {
+    // Vérifiez les dimensions
+    if (gridDim.x <= 0 || gridDim.y <= 0 || blockDim.x <= 0 || blockDim.y <= 0) {
         printf("Erreur : Dimensions de la grille ou du bloc invalides.\n");
         return NULL;
     }
-
-    // Lancer le kernel pour la transposition
+    if(A==NULL){
+        printf("fdp");
+    }
+    // Lancer le kernel
     cudaError_t err = cudaSuccess;
     cuda_transpose<<<gridDim, blockDim>>>(A->data, res->data, A->lignes, A->colonnes);
+
+    // Vérifiez les erreurs CUDA
     err = cudaGetLastError();
-    
-    // Vérifiez les erreurs CUDA après le lancement du kernel
     if (err != cudaSuccess) {
-        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        printf("A: %dx%d\n",A->colonnes,A->lignes);
+        printf("transpose CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
         return NULL;
     }
 
-    // Synchronisation de l'appareil pour s'assurer que l'exécution a réussi
     err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
         printf("CUDA error after synchronization: %s\n", cudaGetErrorString(err));
         return NULL;
     }
 
-    // Retourner la matrice transposée
     return res;
 }
 
+
 void copy(matrice* A,matrice* C){
-    //TODO
+    cudaMemcpy(C->data,A->data,sizeof(double)*A->lignes*A->colonnes,cudaMemcpyDeviceToDevice);
 }
 
 void mat_RELU(matrice* A,matrice* C){
@@ -401,6 +403,7 @@ void mat_SOFT_MAX(matrice* A,matrice* C){
     }
 }
 
+//TODO
 void mat_SOFT_MAX_d(matrice*A,matrice* C){
     
 }
@@ -408,14 +411,14 @@ void mat_SOFT_MAX_d(matrice*A,matrice* C){
 void dCOST(matrice* A,matrice* obj,matrice* C){
     if(A->colonnes != obj->colonnes || A->lignes != obj->lignes ||
        A->colonnes != C->colonnes || A->lignes != C->lignes){
-        printf("sum invalide");
+        printf("dcost invalide");
         exit(EXIT_FAILURE);
     }
     dim3 blockDim(16);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
-        printf("Erreur : Dimensions de la grille ou du bloc invalides.\n");
+        printf("Erreur : dCost Dimensions de la grille ou du bloc invalides.\n");
         return ;
     }
 
@@ -437,11 +440,12 @@ void dCOST(matrice* A,matrice* obj,matrice* C){
 }
 
 void multiply(matrice* A,double lambda){
+
     dim3 blockDim(16);
     dim3 gridDim((A->colonnes*A->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
-        printf("Erreur : Dimensions de la grille ou du bloc invalides.\n");
+        printf("Erreur : multiply Dimensions de la grille ou du bloc invalides.\n");
         return ;
     }
     cudaError_t err = cudaGetLastError();
@@ -460,4 +464,9 @@ void multiply(matrice* A,double lambda){
         printf("CUDA error after synchronization: %s\n", cudaGetErrorString(err));
         return ;
     }
+}
+
+void free_mat(matrice* mat){
+    cudaFree(mat->data);
+    free(mat);
 }

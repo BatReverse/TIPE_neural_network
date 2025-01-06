@@ -36,11 +36,16 @@ __global__ void cuda_diff(double* A,double* B,double* C,int lignes,int colonnes)
         C[i] = A[i] - B[i];
 }
 
-__global__ void cuda_transpose(double* A,double* C,int lignes_A,int colonnes_A){
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    if(i<lignes_A && j<colonnes_A)
-        C[j*lignes_A+i] =A[i*colonnes_A+j];
+__global__ void cuda_transpose(double* A, double* C, int lignes_A, int colonnes_A) {
+    // Calcul des indices globaux
+    int i = blockIdx.x * blockDim.x + threadIdx.x; // Ligne
+    int j = blockIdx.y * blockDim.y + threadIdx.y; // Colonne
+
+    // Vérification pour éviter les accès hors limites
+    if (i < lignes_A && j < colonnes_A) {
+        // Transposer : A[i, j] devient C[j, i]
+        C[j * lignes_A + i] = A[i * colonnes_A + j];
+    }
 }
 
 __global__ void cuda_RELU(double* A,double* C,int taille){
@@ -86,5 +91,7 @@ __global__ void cuda_softmax(double* A,double* C,int taille,double e){
 }
 
 __global__ void cuda_multiply(double* A,int taille, double lambda){
-    
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<taille)
+        A[i] *= 1;
 }
