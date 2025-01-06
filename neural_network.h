@@ -6,7 +6,7 @@
 //TODO faire tout
 
 //1 RELU, 2 sigmoid, 3 softmax
-#define MIDLAYER 1
+#define MIDLAYER 2
 #define OUTPUTLAYER 2
 
 struct neural_network

@@ -21,7 +21,7 @@ int main(int argc, char const *argv[])
 {
     srand(time(NULL));
     
-    test_xor();
+    testdCost();
     
     return 0;
 }

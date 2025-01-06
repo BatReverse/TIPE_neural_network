@@ -127,3 +127,44 @@ void test_xor(){
         // printf("i: %d \n",i);
     }
 }
+
+void testdCost(){
+    double* res_h = (double*)malloc(sizeof(double)*3);
+    double* obj_h = (double*)malloc(sizeof(double)*3);
+
+
+    res_h[0] = 1;
+    res_h[1] = 0.1;
+    res_h[2] = 0.5;
+
+    obj_h[0] = 0;
+    obj_h[0] = 4;
+    obj_h[0] = 0.4;
+
+    matrice* res = (matrice*)malloc(sizeof(matrice));
+    matrice* obj = (matrice*)malloc(sizeof(matrice));
+
+    res->lignes = 3;
+    res->colonnes=1;
+
+    obj->lignes=3;
+    obj->colonnes=1;
+
+    cudaMalloc(&(res->data), sizeof(double)*3);
+    cudaMalloc(&(obj->data), sizeof(double)*3);
+
+    cudaMemcpy(res->data,res_h,sizeof(double)*3,cudaMemcpyHostToDevice);
+    cudaMemcpy(obj->data,res_h,sizeof(double)*3,cudaMemcpyHostToDevice);
+
+    matrice* C = zeros(3,1);
+
+    dCOST(res,obj,C);
+    /* 
+    supposer etre:
+    2*(res-obj):
+    2
+    -7.8
+    0.2
+    */
+    print_mat(C);
+}
