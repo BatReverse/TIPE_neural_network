@@ -35,14 +35,15 @@ neural_network* cree_reseau(int nb_couche, ...){
         int couche = res->neuronnes_parcouche[i];
         int prochaine = res->neuronnes_parcouche[i+1];
     
-        
-        res->neuronnes_somme[i] = zeros(couche,1);
-        res->neuronnes_activ[i] = zeros(couche,1);
+        if (i!=0){
+            res->neuronnes_somme[i] = zeros(couche,1);
+            res->neuronnes_activ[i] = zeros(couche,1);
+        }
         
 
-    
-        res->poids[i] = random_mat(prochaine,couche,0.5);
-        res->biais[i] = random_mat(prochaine,1,0.5);
+        double x = sqrt(6.)/sqrt(couche+prochaine);
+        res->poids[i] = random_mat(prochaine,couche,x);
+        res->biais[i] = zeros(prochaine,1);
     
         res->dpoids[i] = zeros(prochaine,couche);
         res->dbiais[i] = zeros(prochaine,1);
@@ -55,47 +56,57 @@ neural_network* cree_reseau(int nb_couche, ...){
 
     return res;
 }
+void propagation_avant(neural_network* reseau, matrice* nourriture) {
+    if (reseau == NULL || nourriture == NULL) {
+        printf("Erreur : le réseau ou la matrice d'entrée est NULL.\n");
+        exit(EXIT_FAILURE);
+    }
 
-void propagation_avant(neural_network* reseau,matrice* nourriture){
     int L = reseau->nombre_couche;
 
-    reseau->neuronnes_activ[0] = nourriture;
+    // Vérification des dimensions de l'entrée
+    if (nourriture->lignes != reseau->neuronnes_parcouche[0]) {
+        printf("Erreur : les dimensions de l'entrée (%d) ne correspondent pas à la première couche (%d).\n",
+               nourriture->lignes, reseau->neuronnes_parcouche[0]);
+        exit(EXIT_FAILURE);
+    }
 
+    // Initialisation de la première couche
+    // copy(nourriture, reseau->neuronnes_somme[0]);
+    reseau->neuronnes_activ[0]= nourriture;
 
-    for (int i = 0; i < L-1; i++)
-    {   
-        dot_par(reseau->poids[i],reseau->neuronnes_activ[i],reseau->neuronnes_somme[i+1]);
-        sum(reseau->neuronnes_somme[i+1],reseau->biais[i],reseau->neuronnes_somme[i+1]);         
-        switch (MIDLAYER)
-        {
-            case 1:
-                mat_RELU(reseau->neuronnes_somme[i+1],reseau->neuronnes_activ[i+1]);
-                break;
-            case 2:
-                mat_sigmoid(reseau->neuronnes_somme[i+1],reseau->neuronnes_activ[i+1]);
-                
-                break;
-            case 3:
-                mat_SOFT_MAX(reseau->neuronnes_somme[i+1],reseau->neuronnes_activ[i+1]);
-                break;
+    // Propagation avant pour les couches suivantes
+    for (int i = 0; i < L - 1; i++) {
+        dot_par(reseau->poids[i], reseau->neuronnes_activ[i], reseau->neuronnes_somme[i + 1]);
+        sum(reseau->neuronnes_somme[i + 1], reseau->biais[i], reseau->neuronnes_somme[i + 1]);
 
+        switch (MIDLAYER) {
+            case 1: // ReLU
+                mat_RELU(reseau->neuronnes_somme[i + 1], reseau->neuronnes_activ[i + 1]);
+                break;
+            case 2: // Sigmoïde
+                mat_sigmoid(reseau->neuronnes_somme[i + 1], reseau->neuronnes_activ[i + 1]);
+                break;
+            case 3: // Softmax
+                mat_SOFT_MAX(reseau->neuronnes_somme[i + 1], reseau->neuronnes_activ[i + 1]);
+                break;
             default:
-                printf("MIDLAYER pas defini\n");
+                printf("Erreur : type d'activation MIDLAYER (%d) non défini.\n", MIDLAYER);
                 exit(EXIT_FAILURE);
-                break;
         }
     }
-
 }
 
-void maj_reseau(neural_network* reseau){
-    for(int l=0;l < reseau->nombre_couche-1;l++){
-        multiply(reseau->dpoids[l],reseau->vitesse_apprentissage);
-        multiply(reseau->dbiais[l],reseau->vitesse_apprentissage);
 
-        diff(reseau->biais[l],reseau->dbiais[l],reseau->biais[l]);
+void maj_reseau(neural_network* reseau){
+    int L = reseau->nombre_couche;
+    for (int l = 0; l < L-1; l++) {
+        multiply(reseau->dneuronnes[l],reseau->vitesse_apprentissage);
+        multiply(reseau->dpoids[l],reseau->vitesse_apprentissage);
         diff(reseau->poids[l],reseau->dpoids[l],reseau->poids[l]);
+        diff(reseau->biais[l],reseau->dbiais[l],reseau->biais[l]);
     }
+
 }
 void reset_nn(neural_network* res){
     for (int i = 0; i < res->nombre_couche-1; i++)
@@ -133,22 +144,27 @@ void propagation_arriere(neural_network* reseau,matrice* obj){
             case 3:
                 mat_SOFT_MAX_d(reseau->neuronnes_somme[L-1],tmp2);
                 break;
-
             default:
                 printf("OUTPUT pas defini backprop\n");
                 exit(EXIT_FAILURE);
                 break;
         }
     hadamar(tmp1,tmp2,reseau->dneuronnes[L-1]);
-    print_mat(tmp2);
-    print_mat(reseau->neuronnes_somme[L-1]);
     
+    // printf("weights\n");
+    // print_mat(reseau->poids[L-2]);
+    // printf("tmp2\n");
+    // print_mat(tmp2);
+    // printf("sum ne\n");
+    // print_mat(reseau->neuronnes_somme[L-1]);
+    
+    // printf("\n\n\n\n");
+
     free_mat(tmp1);
     free_mat(tmp2);
 
 
-    for (int i = L-2; i >= 0; i--){
-        
+    for (int i = L-2; i > 0; i--){
         matrice* tr = transpose(reseau->poids[i]);
         matrice* tmp = zeros(tr->lignes,reseau->dneuronnes[i+1]->colonnes);
         matrice* derivs = zeros(reseau->neuronnes_parcouche[i],1);
@@ -181,11 +197,12 @@ void propagation_arriere(neural_network* reseau,matrice* obj){
     }
     
     for(int l=1;l<L;l++){
-        matrice* tr_a = transpose(reseau->neuronnes_activ[l-1]);
-        dot_par(reseau->dneuronnes[l],tr_a,reseau->dpoids[l-1]);
-        copy(reseau->dneuronnes[l],reseau->dbiais[l-1]);
+        matrice* tr_a = transpose(reseau->neuronnes_activ[l - 1]);
+        dot_par(reseau->neuronnes_activ[l], tr_a, reseau->dpoids[l - 1]);
+        copy(reseau->dneuronnes[l], reseau->dbiais[l - 1]);
         free_mat(tr_a);
     }
+    // print_mat(reseau->dbiais[0]);
     maj_reseau(reseau);
 }
 

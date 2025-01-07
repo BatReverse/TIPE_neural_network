@@ -1,7 +1,6 @@
 #include"matrice.h"
 #include<stdio.h>
 #include"kernel.cu"
-
 matrice* zeros(int lignes, int colonnes) {
     matrice* res;
 
@@ -38,7 +37,7 @@ matrice* random_mat(int lignes, int colonnes, double x) {
     double* host_data = (double*)malloc(sizeof(double) * lignes * colonnes);
 
     for (int i = 0; i < lignes * colonnes; i++) {
-        host_data[i] = ((double)rand() / RAND_MAX) * 1.0 * x ; // Générer un nombre entre -x et x
+        host_data[i] = (2.0 * ((double)rand() / RAND_MAX) - 1.0) * x; // Générer un nombre entre 0 et x
     }
 
     // Copier les données générées du CPU vers le GPU
@@ -49,6 +48,7 @@ matrice* random_mat(int lignes, int colonnes, double x) {
 
     return res;
 }
+
 
 void print_mat(matrice* mat_device) {
     // Allouer un tableau sur le CPU pour copier les données
@@ -71,41 +71,44 @@ void print_mat(matrice* mat_device) {
     free(mat_host);
 }
 
-void dot_par(matrice* A,matrice* B,matrice* C){
+void dot_par(matrice* A, matrice* B, matrice* C) {
     if (A->colonnes != B->lignes || C->lignes != A->lignes || C->colonnes != B->colonnes) {
-       printf("Erreur : Dimensions incompatibles pour le produit matriciel (A: %dx%d, B: %dx%d, C: %dx%d).\n",
-       A->lignes, A->colonnes, B->lignes, B->colonnes, C->lignes, C->colonnes);
+        printf("Erreur : Dimensions incompatibles pour le produit matriciel (A: %dx%d, B: %dx%d, C: %dx%d).\n",
+               A->lignes, A->colonnes, B->lignes, B->colonnes, C->lignes, C->colonnes);
         exit(EXIT_FAILURE);
     }
-    
-    //TODO verifier
 
+    // Définition des dimensions du bloc et de la grille pour CUDA
     dim3 blockDim(16, 16);
-    dim3 gridDim((C->colonnes + blockDim.x - 1) / blockDim.x, (C->lignes + blockDim.y - 1) / blockDim.y);
+    dim3 gridDim((C->colonnes + blockDim.x - 1) / blockDim.x, 
+                 (C->lignes + blockDim.y - 1) / blockDim.y);
 
-
-    
-    if (gridDim.x == 0 ||  blockDim.x == 0 ) {
-        printf("Erreur : dot par Dimensions de la grille ou du bloc invalides.\n");
-        return ;
+    // Vérification des dimensions de la grille et du bloc
+    if (gridDim.x == 0 || blockDim.x == 0) {
+        printf("Erreur : Dimensions de la grille ou du bloc invalides.\n");
+        return;
     }
 
+    // Lancement du kernel de multiplication matricielle
+    cuda_dot<<<gridDim, blockDim>>>(A->data, A->lignes, A->colonnes, 
+                                    B->data, B->lignes, B->colonnes, 
+                                    C->data, C->lignes, C->colonnes);
+
+    // Vérification des erreurs CUDA après le lancement du kernel
     cudaError_t err = cudaGetLastError();
-    cuda_dot<<<gridDim, blockDim>>>(A->data,A->lignes,A->colonnes, B->data,B->lignes,B->colonnes, C->data,C->lignes,C->colonnes);
-        
-    // Vérifiez les erreurs CUDA après le lancement du kernel
     if (err != cudaSuccess) {
         printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
-        return ;
+        return;
     }
 
     // Synchronisation de l'appareil pour s'assurer que l'exécution a réussi
     err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
         printf("CUDA error after synchronization: %s\n", cudaGetErrorString(err));
-        return ;
+        return;
     }
 }
+
 
 void hadamar(matrice* A,matrice* B,matrice *C){
     if(A->colonnes != B->colonnes || A->lignes != B->lignes ||
@@ -240,7 +243,16 @@ matrice* transpose(matrice* A) {
 
 
 void copy(matrice* A,matrice* C){
+    if(A->colonnes != C->colonnes || A->lignes != C->lignes){
+        printf("copy invalide");
+        exit(EXIT_FAILURE);
+    }
     cudaMemcpy(C->data,A->data,sizeof(double)*A->lignes*A->colonnes,cudaMemcpyDeviceToDevice);
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        return ;
+    }
 }
 
 void mat_RELU(matrice* A,matrice* C){
@@ -335,9 +347,10 @@ void mat_sigmoid(matrice* A,matrice* C){
         return ;
     }
 }
+
 void mat_sigmoid_d(matrice* A,matrice* C){
     if(A->colonnes != C->colonnes || A->lignes != C->lignes){
-        printf("RELU_mat invalide");
+        printf("sig_d invalide");
         exit(EXIT_FAILURE);
     }
     dim3 blockDim(16);

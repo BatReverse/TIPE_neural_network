@@ -7,18 +7,29 @@ __global__ void cuda_dcost(double* A,double* obj,double* C,int lignes,int colonn
         C[i] = 2*(A[i] - obj[i]);
 }
 
-__global__ void cuda_dot(double* A,int ligne_A,int colonnes_A,double* B,int ligne_B,int colonnes_B,double* C,int ligne_C,int colonnes_C) {
+__global__ void cuda_dot(
+    double* A, int lignes_A, int colonnes_A,
+    double* B, int lignes_B, int colonnes_B,
+    double* C, int lignes_C, int colonnes_C) {
+
+    // Indices globaux pour les lignes et colonnes de la matrice C
     int ligne = blockIdx.y * blockDim.y + threadIdx.y;
     int colonne = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (ligne < ligne_C && colonne < colonnes_C) {
-        for (int i = 0; i < ligne_B; i++)
-        {
-            C[ligne*colonnes_C+colonne] += A[ligne*colonnes_A+i]*B[i*colonnes_B+colonne];
+    // Vérification des limites pour éviter les accès hors limites
+    if (ligne < lignes_C && colonne < colonnes_C) {
+        double somme = 0.0;
+
+        // Calcul du produit scalaire pour C[ligne, colonne]
+        for (int i = 0; i < colonnes_A; i++) { // colonnes_A == lignes_B
+            somme += A[ligne * colonnes_A + i] * B[i * colonnes_B + colonne];
         }
-        
+
+        // Stocker le résultat dans C
+        C[ligne * colonnes_C + colonne] = somme;
     }
 }
+
 
 __global__ void cuda_hadamard(double* A,double* B,double* C,int lignes,int colonnes){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
@@ -38,8 +49,8 @@ __global__ void cuda_diff(double* A,double* B,double* C,int lignes,int colonnes)
 
 __global__ void cuda_transpose(double* A, double* C, int lignes_A, int colonnes_A) {
     // Calcul des indices globaux
-    int i = blockIdx.x * blockDim.x + threadIdx.x; // Ligne
-    int j = blockIdx.y * blockDim.y + threadIdx.y; // Colonne
+    int j = blockIdx.x * blockDim.x + threadIdx.x; // Ligne
+    int i = blockIdx.y * blockDim.y + threadIdx.y; // Colonne
 
     // Vérification pour éviter les accès hors limites
     if (i < lignes_A && j < colonnes_A) {
@@ -93,5 +104,5 @@ __global__ void cuda_softmax(double* A,double* C,int taille,double e){
 __global__ void cuda_multiply(double* A,int taille, double lambda){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<taille)
-        A[i] *= 1;
+        A[i] *= lambda;
 }

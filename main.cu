@@ -20,8 +20,6 @@ void neural_test(){
 int main(int argc, char const *argv[])
 {
     srand(time(NULL));
-    
-    testdCost();
-    
+    test_xor();
     return 0;
 }

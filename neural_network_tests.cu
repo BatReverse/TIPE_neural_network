@@ -1,6 +1,7 @@
 #include"neural_network.h"
 #include"matrice.h"
 #include<stdio.h>
+#include"network_vis.cu"
 
 matrice** creationressources_xor(){
     matrice** ressources = (matrice**)malloc(sizeof(matrice*)*4);
@@ -96,16 +97,14 @@ matrice** creationtests_xor() {
 
 
 void test_xor(){
-    neural_network* reseau = cree_reseau(3,2,3,1);
-
+    neural_network* reseau = cree_reseau(3,2,4,1);
     matrice** ressources = creationressources_xor();
     matrice** test= creationtests_xor();
 
-    for(int i=0;i<100000;i++){
+    for(int i=0;i<10000000;i++){
         int k = rand()%4;
 
         propagation_avant(reseau,ressources[k]);
-        // transpose(reseau->poids[reseau->nombre_couche-2]);
         propagation_arriere(reseau,test[k]);
         if(i%1000 == 0){
             printf("i: %d\n",i);
@@ -113,33 +112,38 @@ void test_xor(){
             for(int i=0;i<4;i++){
                 propagation_avant(reseau,ressources[i]);
                 result r = obtenir_resultat(reseau);
+                print_mat(reseau->neuronnes_activ[0]);
                 if(i == 0 || i== 1){
                     sum+=r.valeur*r.valeur;
+                    printf("Output: %lf Expected: %lf \n",r.valeur,0.);
                 }else{
                     sum+=(r.valeur-1)*(r.valeur-1);
+                    printf("Output: %lf Expected: %lf \n",r.valeur,1.);
+                    
                 }
             }
-            print_mat(reseau->poids[reseau->nombre_couche-2]);
-            print_mat(reseau->dpoids[reseau->nombre_couche-2]);
-            print_mat(reseau->poids[0]);
+            // print_mat(reseau->poids[reseau->nombre_couche-2]);
+            // print_mat(reseau->dpoids[reseau->nombre_couche-2]);
+            // print_mat(reseau->poids[0]);
             printf("MSE: %lf\n",sum/4.0);
+            // print_mat(reseau->biais[2]);
         }
         // printf("i: %d \n",i);
     }
 }
 
 void testdCost(){
+
     double* res_h = (double*)malloc(sizeof(double)*3);
     double* obj_h = (double*)malloc(sizeof(double)*3);
-
 
     res_h[0] = 1;
     res_h[1] = 0.1;
     res_h[2] = 0.5;
 
     obj_h[0] = 0;
-    obj_h[0] = 4;
-    obj_h[0] = 0.4;
+    obj_h[1] = 4;
+    obj_h[2] = 0.4;
 
     matrice* res = (matrice*)malloc(sizeof(matrice));
     matrice* obj = (matrice*)malloc(sizeof(matrice));
@@ -154,7 +158,7 @@ void testdCost(){
     cudaMalloc(&(obj->data), sizeof(double)*3);
 
     cudaMemcpy(res->data,res_h,sizeof(double)*3,cudaMemcpyHostToDevice);
-    cudaMemcpy(obj->data,res_h,sizeof(double)*3,cudaMemcpyHostToDevice);
+    cudaMemcpy(obj->data,obj_h,sizeof(double)*3,cudaMemcpyHostToDevice);
 
     matrice* C = zeros(3,1);
 
@@ -166,5 +170,20 @@ void testdCost(){
     -7.8
     0.2
     */
+    print_mat(C);
+}
+
+void testtranspose(){
+    matrice* A = random_mat(5,1,10);
+    print_mat(transpose(A));
+    print_mat(A);
+}
+
+void testdot(){
+    matrice* A =random_mat(3,3,1);
+    matrice* B =random_mat(3,3,1);
+    matrice* C =random_mat(3,3,1);
+    print_mat(A);
+    print_mat(B);
     print_mat(C);
 }
