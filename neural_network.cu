@@ -1,14 +1,19 @@
 #include"neural_network.h"
 #include<stdio.h>
 #include"matrice.h"
-
+#include <pthread.h>
+typedef struct nn_thread{
+    int i;
+    matrice* mat;
+    neural_network* reseau;
+} nn_thread;
 
 neural_network* cree_reseau(int nb_couche, ...){
     va_list ap;
 
     neural_network* res = (neural_network*)malloc(sizeof(neural_network));
     res->nombre_couche=nb_couche;
-    res->vitesse_apprentissage = 0.1;
+    res->vitesse_apprentissage = 0.01;
     res->neuronnes_parcouche = (int*)malloc(sizeof(int)*nb_couche);
     
     va_start(ap,nb_couche);
@@ -65,7 +70,7 @@ void propagation_avant(neural_network* reseau, matrice* nourriture) {
     int L = reseau->nombre_couche;
 
     // Vérification des dimensions de l'entrée
-    if (nourriture->lignes != reseau->neuronnes_parcouche[0]) {
+    if (nourriture->lignes*nourriture->colonnes != reseau->neuronnes_parcouche[0]) {
         printf("Erreur : les dimensions de l'entrée (%d) ne correspondent pas à la première couche (%d).\n",
                nourriture->lignes, reseau->neuronnes_parcouche[0]);
         exit(EXIT_FAILURE);
@@ -108,6 +113,7 @@ void maj_reseau(neural_network* reseau){
     }
 
 }
+
 void reset_nn(neural_network* res){
     for (int i = 0; i < res->nombre_couche-1; i++)
     {
@@ -122,6 +128,24 @@ void reset_nn(neural_network* res){
     }
     
 }
+
+struct structparbackprop_t{
+    neural_network* reseau;
+    int l;
+};
+typedef struct structparbackprop_t structparbackprop;
+
+
+void* bp_tmp_aux(void* res){
+    structparbackprop* v = (structparbackprop*)res;
+    int i = v->l;
+    matrice* tr = transpose(v->reseau->poids[i]);
+    matrice* tmp = zeros(tr->lignes,v->reseau->dneuronnes[i+1]->colonnes);
+    dot_par(tr,v->reseau->dneuronnes[i+1],tmp);
+    free_mat(tr);
+    pthread_exit(tmp);
+}
+
 void propagation_arriere(neural_network* reseau,matrice* obj){
     int L = reseau->nombre_couche;
     reset_nn(reseau);
@@ -150,23 +174,19 @@ void propagation_arriere(neural_network* reseau,matrice* obj){
                 break;
         }
     hadamar(tmp1,tmp2,reseau->dneuronnes[L-1]);
-    
-    // printf("weights\n");
-    // print_mat(reseau->poids[L-2]);
-    // printf("tmp2\n");
-    // print_mat(tmp2);
-    // printf("sum ne\n");
-    // print_mat(reseau->neuronnes_somme[L-1]);
-    
-    // printf("\n\n\n\n");
-
     free_mat(tmp1);
     free_mat(tmp2);
-
-
+    
+    matrice* tmp;
+    void* r_tmp;
+    pthread_t th_tmp;
+    structparbackprop tmp_struct;
+    tmp_struct.reseau = reseau;
     for (int i = L-2; i > 0; i--){
-        matrice* tr = transpose(reseau->poids[i]);
-        matrice* tmp = zeros(tr->lignes,reseau->dneuronnes[i+1]->colonnes);
+        tmp_struct.l = i;
+
+        pthread_create(&th_tmp,NULL,bp_tmp_aux,&tmp_struct);
+
         matrice* derivs = zeros(reseau->neuronnes_parcouche[i],1);
 
         switch (MIDLAYER)
@@ -187,18 +207,17 @@ void propagation_arriere(neural_network* reseau,matrice* obj){
                 break;
         }
 
-
-        dot_par(tr,reseau->dneuronnes[i+1],tmp);
+        pthread_join(th_tmp,&r_tmp);
+        tmp = (matrice*)r_tmp;
         hadamar(tmp,derivs,reseau->dneuronnes[i]);
         
-        free_mat(tr);
         free_mat(tmp);
         free_mat(derivs);
     }
     
     for(int l=1;l<L;l++){
         matrice* tr_a = transpose(reseau->neuronnes_activ[l - 1]);
-        dot_par(reseau->neuronnes_activ[l], tr_a, reseau->dpoids[l - 1]);
+        dot_par(reseau->dneuronnes[l], tr_a, reseau->dpoids[l - 1]);
         copy(reseau->dneuronnes[l], reseau->dbiais[l - 1]);
         free_mat(tr_a);
     }

@@ -2,6 +2,11 @@
 #include"matrice.h"
 #include<stdio.h>
 #include"network_vis.cu"
+#include"MNIST_manager.h"
+#include<stdbool.h>
+#include"inttypes.h"
+#include<stdlib.h>
+#include<unistd.h>
 
 matrice** creationressources_xor(){
     matrice** ressources = (matrice**)malloc(sizeof(matrice*)*4);
@@ -101,18 +106,18 @@ void test_xor(){
     matrice** ressources = creationressources_xor();
     matrice** test= creationtests_xor();
 
-    for(int i=0;i<10000000;i++){
+    for(int i=0;i<1000000;i++){
         int k = rand()%4;
 
         propagation_avant(reseau,ressources[k]);
         propagation_arriere(reseau,test[k]);
-        if(i%1000 == 0){
+        if(i%10000 == 0){
             printf("i: %d\n",i);
             double sum=0;
             for(int i=0;i<4;i++){
                 propagation_avant(reseau,ressources[i]);
                 result r = obtenir_resultat(reseau);
-                print_mat(reseau->neuronnes_activ[0]);
+                // print_mat(reseau->neuronnes_activ[0]);
                 if(i == 0 || i== 1){
                     sum+=r.valeur*r.valeur;
                     printf("Output: %lf Expected: %lf \n",r.valeur,0.);
@@ -179,6 +184,28 @@ void testtranspose(){
     print_mat(A);
 }
 
+void melange_Fisher(data* data,int N){}
+
+double train_and_test_MNIST(){
+    data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
+    data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
+    int n = t_test->colonnes*t_test->lignes;
+    printf("set done\n");
+
+    matrice** obj = get_obj(10);
+    neural_network* reseau = cree_reseau(3,n,800,10);
+
+    for (int i = 0; i < 5000; i++)
+    {
+        /* code */
+        propagation_avant(reseau,t_train->cur_data[i].data);
+        propagation_arriere(reseau,obj[t_train->cur_data[i].label]);
+    }
+    printf("done\n");
+    
+    return 0.;
+}
+
 void testdot(){
     matrice* A =random_mat(3,3,1);
     matrice* B =random_mat(3,3,1);
@@ -186,4 +213,10 @@ void testdot(){
     print_mat(A);
     print_mat(B);
     print_mat(C);
+}
+
+void testMNISTinit(){
+    data_set* t_labels= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
+
+    print_image(t_labels,3);
 }
