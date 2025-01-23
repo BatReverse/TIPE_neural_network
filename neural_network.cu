@@ -102,6 +102,21 @@ void propagation_avant(neural_network* reseau, matrice* nourriture) {
     }
 }
 
+double cout(neural_network* reseau, matrice* obj){
+    int N = obj->colonnes*obj->lignes;
+    double* obj_h = (double*)malloc(sizeof(double)*N);
+    double* res_h = (double*)malloc(sizeof(double)*N);
+    double sum =0;
+    cudaMemcpy(res_h,reseau->neuronnes_activ[reseau->nombre_couche-1]->data,N*sizeof(double),cudaMemcpyDeviceToHost);
+    cudaMemcpy(obj_h,obj->data,N*sizeof(double),cudaMemcpyDeviceToHost);
+
+    for(int i=0;i<N;i++){
+        sum+=(obj_h[i]-res_h[i])*(obj_h[i]-res_h[i]);
+    }
+    free(obj_h);
+    free(res_h);
+    return sum;
+}
 
 void maj_reseau(neural_network* reseau){
     int L = reseau->nombre_couche;

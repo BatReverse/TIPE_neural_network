@@ -191,18 +191,30 @@ double train_and_test_MNIST(){
     data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
     int n = t_test->colonnes*t_test->lignes;
     printf("set done\n");
-
+    int k=0;
     matrice** obj = get_obj(10);
     neural_network* reseau = cree_reseau(3,n,800,10);
 
-    for (int i = 0; i < 5000; i++)
+    printf("debut generation %d \n",k);
+    for (int i = 0; i < t_train->Nombre_image; i++)
     {
         /* code */
         propagation_avant(reseau,t_train->cur_data[i].data);
         propagation_arriere(reseau,obj[t_train->cur_data[i].label]);
     }
-    printf("done\n");
-    
+    printf("debut test\n");
+    double sum = 0;
+    int win =0;
+    for (int i = 0; i < t_test->Nombre_image; i++)
+    {
+        propagation_avant(reseau,t_test->cur_data[i].data);
+        win += obtenir_resultat(reseau).indice == t_test->cur_data[i].label ? 1 : 0;
+        sum+=cout(reseau,obj[t_test->cur_data[i].label]);
+        
+    }
+    printf("MSE: %lf \n",sum/(double)t_test->Nombre_image);
+    printf("winrate: %lf \n",(double)win/((double)t_test->Nombre_image)*100);
+
     return 0.;
 }
 

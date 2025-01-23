@@ -41,6 +41,6 @@ void propagation_avant(neural_network* reseau,matrice* nourriture);
 void propagation_arriere(neural_network* reseau,matrice* obj);
 
 result obtenir_resultat(neural_network* reseau);
-
+double cout(neural_network* reseau, matrice* obj);
 
 #endif
