@@ -1,16 +1,16 @@
 #include"matrice.h"
 #include"stdio.h"
 
-__global__ void cuda_dcost(double* A,double* obj,double* C,int lignes,int colonnes){
+__global__ void cuda_dcost(float* A,float* obj,float* C,int lignes,int colonnes){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<lignes*colonnes)
         C[i] = 2*(A[i] - obj[i]);
 }
 
 __global__ void cuda_dot(
-    double* A, int lignes_A, int colonnes_A,
-    double* B, int lignes_B, int colonnes_B,
-    double* C, int lignes_C, int colonnes_C) {
+    float* A, int lignes_A, int colonnes_A,
+    float* B, int lignes_B, int colonnes_B,
+    float* C, int lignes_C, int colonnes_C) {
 
     // Indices globaux pour les lignes et colonnes de la matrice C
     int ligne = blockIdx.y * blockDim.y + threadIdx.y;
@@ -18,7 +18,7 @@ __global__ void cuda_dot(
 
     // Vérification des limites pour éviter les accès hors limites
     if (ligne < lignes_C && colonne < colonnes_C) {
-        double somme = 0.0;
+        float somme = 0.0;
 
         // Calcul du produit scalaire pour C[ligne, colonne]
         for (int i = 0; i < colonnes_A; i++) { // colonnes_A == lignes_B
@@ -31,23 +31,23 @@ __global__ void cuda_dot(
 }
 
 
-__global__ void cuda_hadamard(double* A,double* B,double* C,int lignes,int colonnes){
+__global__ void cuda_hadamard(float* A,float* B,float* C,int lignes,int colonnes){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<lignes*colonnes)
         C[i] = A[i] * B[i];
 }
-__global__ void cuda_sum(double* A,double* B,double* C,int lignes,int colonnes){
+__global__ void cuda_sum(float* A,float* B,float* C,int lignes,int colonnes){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<lignes*colonnes)
         C[i] = A[i] + B[i];
 }
-__global__ void cuda_diff(double* A,double* B,double* C,int lignes,int colonnes){
+__global__ void cuda_diff(float* A,float* B,float* C,int lignes,int colonnes){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<lignes*colonnes)
         C[i] = A[i] - B[i];
 }
 
-__global__ void cuda_transpose(double* A, double* C, int lignes_A, int colonnes_A) {
+__global__ void cuda_transpose(float* A, float* C, int lignes_A, int colonnes_A) {
     // Calcul des indices globaux
     int j = blockIdx.x * blockDim.x + threadIdx.x; // Ligne
     int i = blockIdx.y * blockDim.y + threadIdx.y; // Colonne
@@ -59,7 +59,7 @@ __global__ void cuda_transpose(double* A, double* C, int lignes_A, int colonnes_
     }
 }
 
-__global__ void cuda_RELU(double* A,double* C,int taille){
+__global__ void cuda_RELU(float* A,float* C,int taille){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<taille){
         if (A[i]>0) 
@@ -69,7 +69,7 @@ __global__ void cuda_RELU(double* A,double* C,int taille){
     }
 }
 
-__global__ void cuda_RELU_d(double* A,double* C,int taille){
+__global__ void cuda_RELU_d(float* A,float* C,int taille){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<taille){
         if(A[i]>0)
@@ -79,30 +79,36 @@ __global__ void cuda_RELU_d(double* A,double* C,int taille){
     }
 }
 
-__global__ void cuda_sigmoid(double* A,double* C,int taille){
+__global__ void cuda_sigmoid(float* A,float* C,int taille){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<taille){
         C[i] = 1/(1+exp(-A[i]));    
     }
 }
 
-__global__ void cuda_sigmoid_d(double* A,double* C,int taille){
+__global__ void cuda_sigmoid_d(float* A,float* C,int taille){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<taille){
-        double sig= 1/(1+exp(-A[i]));
+        float sig= 1/(1+exp(-A[i]));
         C[i] = sig*(1-sig);    
     }
 }
 
-__global__ void cuda_softmax(double* A,double* C,int taille,double e){
+__global__ void cuda_softmax(float* A,float* C,int taille,float e){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<taille){
         C[i] = exp(A[i])/e;
     }
 }
 
-__global__ void cuda_multiply(double* A,int taille, double lambda){
+__global__ void cuda_multiply(float* A,int taille, float lambda){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<taille)
         A[i] *= lambda;
+}
+
+__global__ void cuda_cout(float* A, float* B, int taille, float* res){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<taille)
+        atomicAdd(res,(A[i]-B[i])*(A[i]-B[i]));
 }

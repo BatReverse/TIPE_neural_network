@@ -4,13 +4,13 @@ struct matrice
 {
     int lignes;
     int colonnes;
-    double* data;
+    float* data;
 };
 
 
 matrice* zeros(int lignes, int colonnes);
 void print_mat(matrice* mat_device);
-matrice* random_mat(int lignes, int colonnes, double x);
+matrice* random_mat(int lignes, int colonnes, float x);
 void free_mat(matrice* mat);
 
 
@@ -38,6 +38,6 @@ void mat_SOFT_MAX_d(matrice*A,matrice* C);
 
 //TODO 
 void dCOST(matrice* A,matrice* obj, matrice* C);
-void multiply(matrice* A,double lambda);
+void multiply(matrice* A,float lambda);
 
 #endif

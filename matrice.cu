@@ -12,15 +12,15 @@ matrice* zeros(int lignes, int colonnes) {
     res->colonnes = colonnes;
 
     // Allouer la mémoire pour les données sur le GPU
-    cudaMalloc(&(res->data), sizeof(double) * lignes * colonnes);
+    cudaMalloc(&(res->data), sizeof(float) * lignes * colonnes);
 
     // Initialiser les données à 0 sur le GPU
-    cudaMemset(res->data, 0, sizeof(double) * lignes * colonnes);
+    cudaMemset(res->data, 0, sizeof(float) * lignes * colonnes);
 
     return res;
 }
 
-matrice* random_mat(int lignes, int colonnes, double x) {
+matrice* random_mat(int lignes, int colonnes, float x) {
     matrice* res;
 
     // Allouer la structure matrice sur le CPU
@@ -31,17 +31,17 @@ matrice* random_mat(int lignes, int colonnes, double x) {
     res->colonnes = colonnes;
 
     // Allouer la mémoire pour les données sur le GPU
-    cudaMalloc(&(res->data), sizeof(double) * lignes * colonnes);
+    cudaMalloc(&(res->data), sizeof(float) * lignes * colonnes);
 
     // Générer les données aléatoires sur le CPU
-    double* host_data = (double*)malloc(sizeof(double) * lignes * colonnes);
+    float* host_data = (float*)malloc(sizeof(float) * lignes * colonnes);
 
     for (int i = 0; i < lignes * colonnes; i++) {
-        host_data[i] = (2.0 * ((double)rand() / RAND_MAX) - 1.0) * x; // Générer un nombre entre 0 et x
+        host_data[i] = (2.0 * ((float)rand() / RAND_MAX) - 1.0) * x; // Générer un nombre entre 0 et x
     }
 
     // Copier les données générées du CPU vers le GPU
-    cudaMemcpy(res->data, host_data, sizeof(double) * lignes * colonnes, cudaMemcpyHostToDevice);
+    cudaMemcpy(res->data, host_data, sizeof(float) * lignes * colonnes, cudaMemcpyHostToDevice);
 
     // Libérer la mémoire temporaire sur le CPU
     free(host_data);
@@ -53,10 +53,10 @@ matrice* random_mat(int lignes, int colonnes, double x) {
 void print_mat(matrice* mat_device) {
     // Allouer un tableau sur le CPU pour copier les données
     int total_size = mat_device->lignes * mat_device->colonnes;
-    double* mat_host = (double*)malloc(sizeof(double) * total_size);
+    float* mat_host = (float*)malloc(sizeof(float) * total_size);
 
     // Copier les données de la mémoire GPU (device) vers la mémoire CPU (host)
-    cudaMemcpy(mat_host, mat_device->data, sizeof(double) * total_size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(mat_host, mat_device->data, sizeof(float) * total_size, cudaMemcpyDeviceToHost);
 
     // Imprimer la matrice
     printf("Matrice (%d x %d):\n", mat_device->lignes, mat_device->colonnes);
@@ -247,7 +247,7 @@ void copy(matrice* A,matrice* C){
         printf("copy invalide");
         exit(EXIT_FAILURE);
     }
-    cudaMemcpy(C->data,A->data,sizeof(double)*A->lignes*A->colonnes,cudaMemcpyDeviceToDevice);
+    cudaMemcpy(C->data,A->data,sizeof(float)*A->lignes*A->colonnes,cudaMemcpyDeviceToDevice);
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
@@ -388,9 +388,9 @@ void mat_SOFT_MAX(matrice* A,matrice* C){
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     int N = A->lignes*A->colonnes;
-    double e;
-    double* A_host=(double*)malloc(sizeof(double)*N);
-    cudaMemcpy(A_host,A->data,sizeof(double)*N,cudaMemcpyDeviceToHost);
+    float e;
+    float* A_host=(float*)malloc(sizeof(float)*N);
+    cudaMemcpy(A_host,A->data,sizeof(float)*N,cudaMemcpyDeviceToHost);
 
     //TODO optimiser code
     for (int i = 0; i < N; i++)
@@ -452,7 +452,7 @@ void dCOST(matrice* A,matrice* obj,matrice* C){
     }
 }
 
-void multiply(matrice* A,double lambda){
+void multiply(matrice* A,float lambda){
 
     dim3 blockDim(16);
     dim3 gridDim((A->colonnes*A->lignes+blockDim.x - 1)/blockDim.x);

@@ -24,14 +24,14 @@ struct neural_network
     matrice** dbiais;
     matrice** dneuronnes;
 
-    double vitesse_apprentissage;
+    float vitesse_apprentissage;
 };
 typedef struct neural_network neural_network;
 
 struct result
 {
     int indice;
-    double valeur;
+    float valeur;
 };
 typedef struct result result;
 
@@ -41,6 +41,6 @@ void propagation_avant(neural_network* reseau,matrice* nourriture);
 void propagation_arriere(neural_network* reseau,matrice* obj);
 
 result obtenir_resultat(neural_network* reseau);
-double cout(neural_network* reseau, matrice* obj);
+float cout(neural_network* reseau, matrice* obj);
 
 #endif

@@ -2,6 +2,7 @@
 #include<stdio.h>
 #include"matrice.h"
 #include <pthread.h>
+#include"kernel.h"
 typedef struct nn_thread{
     int i;
     matrice* mat;
@@ -46,7 +47,7 @@ neural_network* cree_reseau(int nb_couche, ...){
         }
         
 
-        double x = sqrt(6.)/sqrt(couche+prochaine);
+        float x = sqrt(6.)/sqrt(couche+prochaine);
         res->poids[i] = random_mat(prochaine,couche,x);
         res->biais[i] = zeros(prochaine,1);
     
@@ -102,20 +103,38 @@ void propagation_avant(neural_network* reseau, matrice* nourriture) {
     }
 }
 
-double cout(neural_network* reseau, matrice* obj){
-    int N = obj->colonnes*obj->lignes;
-    double* obj_h = (double*)malloc(sizeof(double)*N);
-    double* res_h = (double*)malloc(sizeof(double)*N);
-    double sum =0;
-    cudaMemcpy(res_h,reseau->neuronnes_activ[reseau->nombre_couche-1]->data,N*sizeof(double),cudaMemcpyDeviceToHost);
-    cudaMemcpy(obj_h,obj->data,N*sizeof(double),cudaMemcpyDeviceToHost);
+float cout(neural_network* reseau, matrice* obj){
+    float* sum;
+    cudaMalloc(&sum,sizeof(float));
+    cudaMemset(sum,0,sizeof(float));
+    matrice* A = reseau->neuronnes_activ[reseau->nombre_couche-1];
 
-    for(int i=0;i<N;i++){
-        sum+=(obj_h[i]-res_h[i])*(obj_h[i]-res_h[i]);
+    dim3 blockDim(16);
+    dim3 gridDim((A->colonnes*A->lignes+blockDim.x - 1)/blockDim.x);
+
+    if (gridDim.x == 0 ||  blockDim.x == 0 ) {
+        printf("Erreur : multiply Dimensions de la grille ou du bloc invalides.\n");
+        return -1;
     }
-    free(obj_h);
-    free(res_h);
-    return sum;
+    cudaError_t err = cudaGetLastError();
+    cuda_cout<<<gridDim,blockDim>>>(A->data,obj->data,A->lignes*A->colonnes,sum);
+    
+
+    // Vérifiez les erreurs CUDA après le lancement du kernel
+    if (err != cudaSuccess) {
+        printf("CUDA error after kernel launch ici: %s\n", cudaGetErrorString(err));
+        return -1;
+    }
+
+    // Synchronisation de l'appareil pour s'assurer que l'exécution a réussi
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        printf("CUDA error after synchronization: %s\n", cudaGetErrorString(err));
+        return -1;
+    }
+    float sum_h;
+    cudaMemcpy(&sum_h,sum,sizeof(float),cudaMemcpyDeviceToHost);
+    return sum_h;
 }
 
 void maj_reseau(neural_network* reseau){
@@ -132,9 +151,9 @@ void maj_reseau(neural_network* reseau){
 void reset_nn(neural_network* res){
     for (int i = 0; i < res->nombre_couche-1; i++)
     {
-        cudaMemset(res->dbiais[i]->data,0,sizeof(double)*res->dbiais[i]->lignes*res->dbiais[i]->colonnes);
-        cudaMemset(res->dneuronnes[i]->data,0,sizeof(double)*res->dneuronnes[i]->lignes*res->dneuronnes[i]->colonnes);
-        cudaMemset(res->dpoids[i]->data,0,sizeof(double)*res->dpoids[i]->lignes*res->dpoids[i]->colonnes);
+        cudaMemset(res->dbiais[i]->data,0,sizeof(float)*res->dbiais[i]->lignes*res->dbiais[i]->colonnes);
+        cudaMemset(res->dneuronnes[i]->data,0,sizeof(float)*res->dneuronnes[i]->lignes*res->dneuronnes[i]->colonnes);
+        cudaMemset(res->dpoids[i]->data,0,sizeof(float)*res->dpoids[i]->lignes*res->dpoids[i]->colonnes);
         
     }
     cudaError_t err = cudaDeviceSynchronize();
@@ -241,12 +260,12 @@ void propagation_arriere(neural_network* reseau,matrice* obj){
 }
 
 result obtenir_resultat(neural_network* reseau){
-    double max = -1;
+    float max = -1;
     int indice =0;
     int L = reseau->nombre_couche-1;
     int N = reseau->neuronnes_activ[L]->colonnes * reseau->neuronnes_activ[L]->lignes;
-    double* host_d = (double*)malloc(sizeof(double) * N);
-    cudaError_t err = cudaMemcpy(host_d,reseau->neuronnes_activ[L]->data,sizeof(double)*N,cudaMemcpyDeviceToHost);
+    float* host_d = (float*)malloc(sizeof(float) * N);
+    cudaError_t err = cudaMemcpy(host_d,reseau->neuronnes_activ[L]->data,sizeof(float)*N,cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) {
         printf("Erreur CUDA lors du transfert mémoire : %s\n", cudaGetErrorString(err));
         free(host_d); // Libération de la mémoire allouée
@@ -254,7 +273,7 @@ result obtenir_resultat(neural_network* reseau){
     }
     for (int i = 0; i < N; i++)
     {
-        double d =host_d[i]; 
+        float d =host_d[i]; 
 
         if(d>max){
             max = d;

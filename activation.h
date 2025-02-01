@@ -1,9 +1,9 @@
 #ifndef ACTIVATION
 #define ACTIVATION
 
-double sigmoid(double x);
-double RELU(double x);
-double sigmoid_d(double x);
-double RELU_d(double x);
+float sigmoid(float x);
+float RELU(float x);
+float sigmoid_d(float x);
+float RELU_d(float x);
 
 #endif

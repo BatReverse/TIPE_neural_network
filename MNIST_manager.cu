@@ -20,8 +20,8 @@ void print_image(data_set* d,int k) {
     // printf("Image:\n");
 
     // Parcours des pixels de l'image
-    double* data_h = (double*)malloc(sizeof(double)* rows*cols);
-    cudaMemcpy(data_h,d->cur_data[k].data->data,sizeof(double)* rows*cols,cudaMemcpyDeviceToHost);
+    float* data_h = (float*)malloc(sizeof(float)* rows*cols);
+    cudaMemcpy(data_h,d->cur_data[k].data->data,sizeof(float)* rows*cols,cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
@@ -52,13 +52,13 @@ void get_image_array(data_set* d){
     for(int i=0;i<N;i++){
         c[i].data = zeros(n*m,1);
         c[i].label = fgetc(d->flabels);
-        double* data_h = (double*)malloc(sizeof(double)*n*m);
+        float* data_h = (float*)malloc(sizeof(float)*n*m);
         for(int j=0;j<n*m;j++){
-            double t = fgetc(d->fimages);
+            float t = fgetc(d->fimages);
             
             data_h[j] = t;
         }
-        cudaMemcpy(c[i].data->data,data_h,sizeof(double)*n*m,cudaMemcpyHostToDevice);
+        cudaMemcpy(c[i].data->data,data_h,sizeof(float)*n*m,cudaMemcpyHostToDevice);
 
         // free(data_h);
     }
@@ -72,7 +72,7 @@ void get_next(data_set* d){
     };
     int colonnes = d->cur_data->data->colonnes;
     int lignes =d->cur_data->data->lignes;
-    double* data_h = (double*)malloc(sizeof(double)*lignes*colonnes);
+    float* data_h = (float*)malloc(sizeof(float)*lignes*colonnes);
 
     for(int i=0;i<colonnes*lignes;i++){
         data_h[i] = fgetc(d->fimages);
@@ -176,7 +176,7 @@ matrice** get_obj(int n){
     matrice** res = (matrice**)malloc(sizeof(matrice*)*n);
     for(int i=0;i<n;i++){
         res[i] = zeros(n,1);
-        double* data_h = (double*)malloc(sizeof(double)*n);
+        float* data_h = (float*)malloc(sizeof(float)*n);
         for(int j=0;j<n;j++){
             if(j==i){
                 data_h[j] = 1.0;
@@ -184,7 +184,7 @@ matrice** get_obj(int n){
             else
                 data_h[j] = 0.;
         }
-        cudaMemcpy(res[i]->data,data_h,sizeof(double)*n,cudaMemcpyHostToDevice);
+        cudaMemcpy(res[i]->data,data_h,sizeof(float)*n,cudaMemcpyHostToDevice);
     }
     return res;
 }
