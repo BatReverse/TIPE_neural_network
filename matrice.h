@@ -1,5 +1,7 @@
 #ifndef MATRICE
 #define MATRICE
+#define Nl 32
+
 struct matrice
 {
     int lignes;

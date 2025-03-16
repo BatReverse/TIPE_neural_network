@@ -79,7 +79,7 @@ void dot_par(matrice* A, matrice* B, matrice* C) {
     }
 
     // Définition des dimensions du bloc et de la grille pour CUDA
-    dim3 blockDim(16, 16);
+    dim3 blockDim(Nl, Nl);
     dim3 gridDim((C->colonnes + blockDim.x - 1) / blockDim.x, 
                  (C->lignes + blockDim.y - 1) / blockDim.y);
 
@@ -116,7 +116,7 @@ void hadamar(matrice* A,matrice* B,matrice *C){
         printf("hadamar invalide");
         exit(EXIT_FAILURE);
     }
-    dim3 blockDim(16);
+    dim3 blockDim(Nl);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
@@ -147,7 +147,7 @@ if(A->colonnes != B->colonnes || A->lignes != B->lignes ||
         printf("sum invalide");
         exit(EXIT_FAILURE);
     }
-    dim3 blockDim(16);
+    dim3 blockDim(Nl);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
@@ -180,7 +180,7 @@ void diff(matrice* A,matrice* B,matrice* C){
         printf("diff invalide");
         exit(EXIT_FAILURE);
     }
-    dim3 blockDim(16);
+    dim3 blockDim(Nl);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
@@ -208,7 +208,7 @@ void diff(matrice* A,matrice* B,matrice* C){
 matrice* transpose(matrice* A) {
     matrice* res = zeros(A->colonnes, A->lignes);
 
-    dim3 blockDim(16, 16);
+    dim3 blockDim(Nl, Nl);
     dim3 gridDim((A->colonnes + blockDim.x - 1) / blockDim.x,
                  (A->lignes + blockDim.y - 1) / blockDim.y);
 
@@ -260,7 +260,7 @@ void mat_RELU(matrice* A,matrice* C){
         printf("RELU_mat invalide");
         exit(EXIT_FAILURE);
     }
-    dim3 blockDim(16);
+    dim3 blockDim(Nl);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
@@ -290,7 +290,7 @@ void mat_RELU_d(matrice* A,matrice* C){
         printf("RELU_mat invalide");
         exit(EXIT_FAILURE);
     }
-    dim3 blockDim(16);
+    dim3 blockDim(Nl);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
@@ -322,7 +322,7 @@ void mat_sigmoid(matrice* A,matrice* C){
         printf("RELU_mat invalide");
         exit(EXIT_FAILURE);
     }
-    dim3 blockDim(16);
+    dim3 blockDim(Nl);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
@@ -353,7 +353,7 @@ void mat_sigmoid_d(matrice* A,matrice* C){
         printf("sig_d invalide");
         exit(EXIT_FAILURE);
     }
-    dim3 blockDim(16);
+    dim3 blockDim(Nl);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
@@ -384,7 +384,7 @@ void mat_SOFT_MAX(matrice* A,matrice* C){
         printf("RELU_mat invalide");
         exit(EXIT_FAILURE);
     }
-        dim3 blockDim(16);
+        dim3 blockDim(Nl);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     int N = A->lignes*A->colonnes;
@@ -427,7 +427,7 @@ void dCOST(matrice* A,matrice* obj,matrice* C){
         printf("dcost invalide");
         exit(EXIT_FAILURE);
     }
-    dim3 blockDim(16);
+    dim3 blockDim(Nl);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
@@ -454,7 +454,7 @@ void dCOST(matrice* A,matrice* obj,matrice* C){
 
 void multiply(matrice* A,float lambda){
 
-    dim3 blockDim(16);
+    dim3 blockDim(Nl);
     dim3 gridDim((A->colonnes*A->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {

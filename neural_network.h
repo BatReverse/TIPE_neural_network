@@ -8,7 +8,6 @@
 //1 RELU, 2 sigmoid, 3 softmax
 #define MIDLAYER 2
 #define OUTPUTLAYER 2
-
 struct neural_network
 {
     int nombre_couche;
@@ -42,5 +41,6 @@ void propagation_arriere(neural_network* reseau,matrice* obj);
 
 result obtenir_resultat(neural_network* reseau);
 float cout(neural_network* reseau, matrice* obj);
-
+void save_neural_network(neural_network* reseau,char* filename);
+neural_network* importer(char* filename);
 #endif

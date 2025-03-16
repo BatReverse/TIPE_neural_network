@@ -8,6 +8,17 @@
 #include<stdlib.h>
 #include<unistd.h>
 
+void afficher_tableau(int* tableau, int taille) {
+    for (int i = 0; i < taille; i++) {
+        printf("%d:%d", i, tableau[i]); // Affiche l'indice et la valeur
+        if (i < taille - 1) {
+            printf(", "); // Ajoute une virgule sauf pour le dernier élément
+        }
+    }
+    printf("\n"); // Saut de ligne à la fin
+}
+
+
 matrice** creationressources_xor(){
     matrice** ressources = (matrice**)malloc(sizeof(matrice*)*4);
 
@@ -190,33 +201,37 @@ float train_and_test_MNIST(){
     data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
     data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
     int n = t_test->colonnes*t_test->lignes;
-    printf("set done\n");
     int k=0;
     matrice** obj = get_obj(10);
-    neural_network* reseau = cree_reseau(3,n,800,10);
-    while (k==0)
+    neural_network* reseau = importer("MNIST.nn");
+    if(reseau==NULL){
+        reseau = cree_reseau(4,n,800,800,10);
+    }
+    while (true)
     {
-            /* code */
-            
-        // printf("debut generation %d \n",k);
-        // for (int i = 0; i < t_train->Nombre_image; i++)
-        // {
-        //     /* code */
-        //     propagation_avant(reseau,t_train->cur_data[i].data);
-        //     propagation_arriere(reseau,obj[t_train->cur_data[i].label]);
-        // }
-        // printf("debut test\n");
+        save_neural_network(reseau,"MNIST.nn");
+        int* wins = (int*)calloc(10,sizeof(int));
+        for (int i = 0; i < t_train->Nombre_image; i++)
+        {
+            propagation_avant(reseau,t_train->cur_data[i].data);
+            propagation_arriere(reseau,obj[t_train->cur_data[i].label]);
+        }
         float sum = 0;
         int win =0;
         for (int i = 0; i < t_test->Nombre_image; i++)
         {
             propagation_avant(reseau,t_test->cur_data[i].data);
-            win += obtenir_resultat(reseau).indice == t_test->cur_data[i].label ? 1 : 0;
-            sum+=cout(reseau,obj[t_test->cur_data[i].label]);
-            
+            int val= obtenir_resultat(reseau).indice == t_test->cur_data[i].label ? 1 : 0;
+            win += val;
+            wins[t_test->cur_data[i].label]+=val;
+            sum+=cout(reseau,obj[t_test->cur_data[i].label]);   
         }
+        printf("gen: %d\n",k);
         printf("MSE: %lf \n",sum/(float)t_test->Nombre_image);
-        printf("winrate: %lf %\n",(float)win/((float)t_test->Nombre_image)*100);
+        printf("winrate: %lf %\n",(float)win/((float)t_test->Nombre_image)*100.);
+        afficher_tableau(wins,10);
+        fflush(stdout);
+        free(wins);
         k++;
     }
     return 0.;
@@ -235,4 +250,17 @@ void testMNISTinit(){
     data_set* t_labels= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
 
     print_image(t_labels,5);
+}
+
+void test_nnsave(){
+    neural_network* reseau = cree_reseau(3,50,800,10);
+    save_neural_network(reseau,"salut.nn");
+    return;
+}
+void test_impnn(){
+    neural_network* reseau = cree_reseau(3,50,800,10);
+    save_neural_network(reseau,"salut.nn");
+    reseau = importer("salut.nn");
+    save_neural_network(reseau,"hey.nn");
+
 }

@@ -109,7 +109,7 @@ float cout(neural_network* reseau, matrice* obj){
     cudaMemset(sum,0,sizeof(float));
     matrice* A = reseau->neuronnes_activ[reseau->nombre_couche-1];
 
-    dim3 blockDim(16);
+    dim3 blockDim(Nl);
     dim3 gridDim((A->colonnes*A->lignes+blockDim.x - 1)/blockDim.x);
 
     if (gridDim.x == 0 ||  blockDim.x == 0 ) {
@@ -287,3 +287,235 @@ result obtenir_resultat(neural_network* reseau){
     return res;
 }
 
+void save_neural_network(neural_network* reseau,char* filename){
+    //il ne sert a rien de sauvegarder le matrices de derivée partielle
+    //le format est du type L \n n1 n2 n3 ...
+    //les poids et biais de chaque couche 
+    //la vitesse d'apprentissage
+    FILE* file = fopen(filename,"w");
+
+    if(file==NULL){
+        exit(EXIT_FAILURE);
+    }
+    int L= reseau->nombre_couche;
+    fprintf(file,"%d\n",L);
+    for (int i = 0; i < L; i++)
+    {
+        fprintf(file,"%d ",reseau->neuronnes_parcouche[i]);
+    }
+    fprintf(file,"\n");
+    for (int i = 0; i < L-1; i++)
+    {
+        int Nw= (reseau->poids[i]->colonnes)*(reseau->poids[i]->lignes);
+        int Nb = (reseau->biais[i]->colonnes)*(reseau->biais[i]->lignes);
+        float* tmpw = (float*)malloc(sizeof(float)*Nw);
+        float* tmpb = (float*)malloc(sizeof(float)*Nb);
+
+        cudaMemcpy(tmpw,reseau->poids[i]->data,
+            sizeof(float)*Nw
+            ,cudaMemcpyDeviceToHost);
+
+        cudaMemcpy(tmpb,reseau->biais[i]->data,
+            sizeof(float)*Nb
+            ,cudaMemcpyDeviceToHost);
+        for (int j = 0; j < Nw; j++)
+        {
+            fprintf(file,"%f ",tmpw[j]);
+        }
+        fprintf(file,"\n");
+        for (int j = 0; j < Nb; j++)
+        {
+            fprintf(file,"%f ",tmpb[j]);
+        }
+        fprintf(file,"\n");
+        free(tmpb);
+        free(tmpw);
+    }
+    fprintf(file,"%f",reseau->vitesse_apprentissage);
+    fclose(file);
+    return;
+}
+
+neural_network* importer(char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        printf("Creation d'un nouveau fichier neuralnetwork\n");
+        return NULL;
+    }
+
+    int L;
+    if (fscanf(file, "%d", &L) != 1) {
+        perror("Failed to read number of layers");
+        fclose(file);
+        return NULL;
+    }
+
+    neural_network* res = (neural_network*)malloc(sizeof(neural_network));
+    if (res == NULL) {
+        perror("Failed to allocate memory for neural network");
+        fclose(file);
+        return NULL;
+    }
+
+    res->nombre_couche = L;
+    res->neuronnes_parcouche = (int*)malloc(sizeof(int) * L);
+    if (res->neuronnes_parcouche == NULL) {
+        perror("Failed to allocate memory for neuronnes_parcouche");
+        free(res);
+        fclose(file);
+        return NULL;
+    }
+
+    for (int i = 0; i < L; i++) {
+        if (fscanf(file, "%d", &(res->neuronnes_parcouche[i])) != 1) {
+            perror("Failed to read neuronnes_parcouche");
+            free(res->neuronnes_parcouche);
+            free(res);
+            fclose(file);
+            return NULL;
+        }
+    }
+
+    res->neuronnes_somme = (matrice**)malloc(sizeof(matrice*) * L);
+    res->neuronnes_activ = (matrice**)malloc(sizeof(matrice*) * L);
+    res->poids = (matrice**)malloc(sizeof(matrice*) * (L - 1));
+    res->biais = (matrice**)malloc(sizeof(matrice*) * (L - 1));
+    res->dpoids = (matrice**)malloc(sizeof(matrice*) * (L - 1));
+    res->dbiais = (matrice**)malloc(sizeof(matrice*) * (L - 1));
+    res->dneuronnes = (matrice**)malloc(sizeof(matrice*) * L);
+
+    if (res->neuronnes_somme == NULL || res->neuronnes_activ == NULL ||
+        res->poids == NULL || res->biais == NULL ||
+        res->dpoids == NULL || res->dbiais == NULL ||
+        res->dneuronnes == NULL) {
+        perror("Failed to allocate memory for matrices");
+        free(res->neuronnes_parcouche);
+        free(res);
+        fclose(file);
+        return NULL;
+    }
+
+    for (int i = 0; i < L - 1; i++) {
+        int couche = res->neuronnes_parcouche[i];
+        int prochaine = res->neuronnes_parcouche[i + 1];
+
+        if (i != 0) {
+            res->neuronnes_somme[i] = zeros(couche, 1);
+            res->neuronnes_activ[i] = zeros(couche, 1);
+        }
+
+        float* tmpw = (float*)malloc(sizeof(float) * prochaine * couche);
+        float* tmpb = (float*)malloc(sizeof(float) * prochaine);
+
+        if (tmpw == NULL || tmpb == NULL) {
+            perror("Failed to allocate memory for tmpw or tmpb");
+            free(res->neuronnes_parcouche);
+            free(res);
+            fclose(file);
+            return NULL;
+        }
+
+        matrice* p = (matrice*)malloc(sizeof(matrice));
+        matrice* b = (matrice*)malloc(sizeof(matrice));
+
+        if (p == NULL || b == NULL) {
+            perror("Failed to allocate memory for poids or biais");
+            free(tmpw);
+            free(tmpb);
+            free(res->neuronnes_parcouche);
+            free(res);
+            fclose(file);
+            return NULL;
+        }
+
+        p->lignes = prochaine;
+        p->colonnes = couche;
+        b->lignes = prochaine;
+        b->colonnes = 1;
+
+        for (int j = 0; j < prochaine * couche; j++) {
+            if (fscanf(file, "%f", &(tmpw[j])) != 1) {
+                perror("Failed to read poids");
+                free(tmpw);
+                free(tmpb);
+                free(p);
+                free(b);
+                free(res->neuronnes_parcouche);
+                free(res);
+                fclose(file);
+                return NULL;
+            }
+        }
+
+        for (int j = 0; j < prochaine; j++) {
+            if (fscanf(file, "%f", &(tmpb[j])) != 1) {
+                perror("Failed to read biais");
+                free(tmpw);
+                free(tmpb);
+                free(p);
+                free(b);
+                free(res->neuronnes_parcouche);
+                free(res);
+                fclose(file);
+                return NULL;
+            }
+        }
+
+        cudaError_t errw = cudaMalloc(&(p->data), sizeof(float) * prochaine * couche);
+        cudaError_t errb = cudaMalloc(&(b->data), sizeof(float) * prochaine);
+
+        if (errw != cudaSuccess || errb != cudaSuccess) {
+            fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(errw));
+            free(tmpw);
+            free(tmpb);
+            free(p);
+            free(b);
+            free(res->neuronnes_parcouche);
+            free(res);
+            fclose(file);
+            return NULL;
+        }
+
+        errw = cudaMemcpy(p->data, tmpw, sizeof(float) * prochaine * couche, cudaMemcpyHostToDevice);
+        errb = cudaMemcpy(b->data, tmpb, sizeof(float) * prochaine, cudaMemcpyHostToDevice);
+
+        if (errw != cudaSuccess || errb != cudaSuccess) {
+            fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(errw));
+            cudaFree(p->data);
+            cudaFree(b->data);
+            free(tmpw);
+            free(tmpb);
+            free(p);
+            free(b);
+            free(res->neuronnes_parcouche);
+            free(res);
+            fclose(file);
+            return NULL;
+        }
+
+        res->poids[i] = p;
+        res->biais[i] = b;
+        res->dpoids[i] = zeros(prochaine, couche);
+        res->dbiais[i] = zeros(prochaine, 1);
+        res->dneuronnes[i] = zeros(couche, 1);
+
+        free(tmpw);
+        free(tmpb);
+    }
+
+    int couche = res->neuronnes_parcouche[L - 1];
+    res->neuronnes_somme[L - 1] = zeros(couche, 1);
+    res->neuronnes_activ[L - 1] = zeros(couche, 1);
+    res->dneuronnes[L - 1] = zeros(couche, 1);
+
+    if (fscanf(file, "%f", &(res->vitesse_apprentissage)) != 1) {
+        perror("Failed to read vitesse_apprentissage");
+        free(res->neuronnes_parcouche);
+        free(res);
+        fclose(file);
+        return NULL;
+    }
+
+    fclose(file);
+    return res;
+}

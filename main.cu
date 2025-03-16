@@ -20,6 +20,7 @@ void neural_test(){
 int main(int argc, char const *argv[])
 {
 
+    // train_and_test_MNIST();
     train_and_test_MNIST();
     return 0;
 }
