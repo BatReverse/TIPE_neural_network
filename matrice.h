@@ -42,4 +42,6 @@ void mat_SOFT_MAX_d(matrice*A,matrice* C);
 void dCOST(matrice* A,matrice* obj, matrice* C);
 void multiply(matrice* A,float lambda);
 
+void diff_avec_constante(matrice* A,matrice* B,matrice* C,float alpha);
+void update_momentum_velocity(matrice*V,matrice* W,float beta);
 #endif

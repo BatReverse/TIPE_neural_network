@@ -9,6 +9,10 @@ typedef struct nn_thread{
     neural_network* reseau;
 } nn_thread;
 
+
+
+
+
 neural_network* cree_reseau(int nb_couche, ...){
     va_list ap;
 
@@ -62,20 +66,21 @@ neural_network* cree_reseau(int nb_couche, ...){
 
     return res;
 }
+
 void propagation_avant(neural_network* reseau, matrice* nourriture) {
-    if (reseau == NULL || nourriture == NULL) {
-        printf("Erreur : le réseau ou la matrice d'entrée est NULL.\n");
-        exit(EXIT_FAILURE);
-    }
+    // if (reseau == NULL || nourriture == NULL) {
+    //     printf("Erreur : le réseau ou la matrice d'entrée est NULL.\n");
+    //     exit(EXIT_FAILURE);
+    // }
 
     int L = reseau->nombre_couche;
 
-    // Vérification des dimensions de l'entrée
-    if (nourriture->lignes*nourriture->colonnes != reseau->neuronnes_parcouche[0]) {
-        printf("Erreur : les dimensions de l'entrée (%d) ne correspondent pas à la première couche (%d).\n",
-               nourriture->lignes, reseau->neuronnes_parcouche[0]);
-        exit(EXIT_FAILURE);
-    }
+    // // Vérification des dimensions de l'entrée
+    // if (nourriture->lignes*nourriture->colonnes != reseau->neuronnes_parcouche[0]) {
+    //     printf("Erreur : les dimensions de l'entrée (%d) ne correspondent pas à la première couche (%d).\n",
+    //            nourriture->lignes, reseau->neuronnes_parcouche[0]);
+    //     exit(EXIT_FAILURE);
+    // }
 
     // Initialisation de la première couche
     // copy(nourriture, reseau->neuronnes_somme[0]);
@@ -102,6 +107,11 @@ void propagation_avant(neural_network* reseau, matrice* nourriture) {
         }
     }
 }
+
+
+
+
+
 
 float cout(neural_network* reseau, matrice* obj){
     float* sum;
@@ -140,7 +150,7 @@ float cout(neural_network* reseau, matrice* obj){
 void maj_reseau(neural_network* reseau){
     int L = reseau->nombre_couche;
     for (int l = 0; l < L-1; l++) {
-        multiply(reseau->dneuronnes[l],reseau->vitesse_apprentissage);
+        multiply(reseau->dbiais[l],reseau->vitesse_apprentissage);
         multiply(reseau->dpoids[l],reseau->vitesse_apprentissage);
         diff(reseau->poids[l],reseau->dpoids[l],reseau->poids[l]);
         diff(reseau->biais[l],reseau->dbiais[l],reseau->biais[l]);
@@ -337,6 +347,7 @@ void save_neural_network(neural_network* reseau,char* filename){
 }
 
 neural_network* importer(char* filename) {
+
     FILE* file = fopen(filename, "r");
     if (file == NULL) {
         printf("Creation d'un nouveau fichier neuralnetwork\n");
@@ -518,4 +529,175 @@ neural_network* importer(char* filename) {
 
     fclose(file);
     return res;
+}
+
+
+optimizer* creer_optimizer(int type,neural_network* reseau,float Beta1,float Beta2){
+    optimizer* res = (optimizer*)malloc(sizeof(optimizer));
+    res->Beta1 = Beta1;
+    res->Beta2 = Beta2;
+    res->epsilon = 1e-8f;
+    res->type = type;
+    int L = reseau->nombre_couche;
+
+    switch (type)
+    {
+        case Rien:
+        
+            break;
+
+        case Momentum:
+            res->Vcw=NULL;
+            res->Vcb=NULL;
+            res->Mcw=NULL;
+            res->Mcb=NULL;
+            res->Mw=NULL;
+            res->Mb=NULL;
+            res->Vw = (matrice**)malloc(sizeof(matrice*)*L);
+            res->Vb = (matrice**)malloc(sizeof(matrice*)*L);
+            
+            for(int i=0; i< L-1;i++){
+                res->Vw[i] = zeros(reseau->poids[i]->lignes,reseau->poids[i]->colonnes);
+                res->Vb[i] = zeros(reseau->biais[i]->lignes,reseau->biais[i]->colonnes);
+            }
+            break;
+
+
+        case Adam:
+            res->Vcw=(matrice**)malloc(sizeof(matrice*)*L);
+            res->Vcb=(matrice**)malloc(sizeof(matrice*)*L);
+            res->Mcw=(matrice**)malloc(sizeof(matrice*)*L);
+            res->Mcb=(matrice**)malloc(sizeof(matrice*)*L);
+            res->Mw=(matrice**)malloc(sizeof(matrice*)*L);
+            res->Mb=(matrice**)malloc(sizeof(matrice*)*L);
+            res->Vw = (matrice**)malloc(sizeof(matrice*)*L);
+            res->Vb = (matrice**)malloc(sizeof(matrice*)*L);
+            
+            for(int i=0; i< L-1;i++){
+                res->Vw[i] = zeros(reseau->poids[i]->lignes,reseau->poids[i]->colonnes);
+                res->Vcw[i]= zeros(reseau->poids[i]->lignes,reseau->poids[i]->colonnes);
+                res->Mcw[i]= zeros(reseau->poids[i]->lignes,reseau->poids[i]->colonnes);
+                res->Mw[i]= zeros(reseau->poids[i]->lignes,reseau->poids[i]->colonnes);
+
+                res->Vb[i] = zeros(reseau->biais[i]->lignes,reseau->biais[i]->colonnes);
+                res->Vcb[i] = zeros(reseau->biais[i]->lignes,reseau->biais[i]->colonnes);
+                res->Mb[i] = zeros(reseau->biais[i]->lignes,reseau->biais[i]->colonnes);
+                res->Mcb[i] = zeros(reseau->biais[i]->lignes,reseau->biais[i]->colonnes);
+            }
+
+            break;
+        
+        default:
+            exit(EXIT_FAILURE);
+            break;
+    }
+    return res;
+}
+
+void maj_reseau_opt(optimizer* opt,neural_network* reseau){
+    int L = reseau->nombre_couche;
+    for (int l = 0; l < L-1; l++) {
+        
+        switch (opt->type)
+        {
+        case Momentum:
+            
+            //poids
+            update_momentum_velocity(opt->Vw[l],reseau->dpoids[l],opt->Beta1);
+            diff_avec_constante(reseau->poids[l],opt->Vw[l],reseau->poids[l],reseau->vitesse_apprentissage);
+            
+            //biais
+            update_momentum_velocity(opt->Vb[l],reseau->dbiais[l],opt->Beta1);
+            diff_avec_constante(reseau->biais[l],opt->Vb[l],reseau->biais[l],reseau->vitesse_apprentissage);
+            
+            break;
+        
+        case Adam:
+
+            
+        default:
+            break;
+        }
+        
+
+
+    }
+}
+
+void propagation_arriere_opt(optimizer* opt, neural_network* reseau,matrice* obj){
+    int L = reseau->nombre_couche;
+    reset_nn(reseau);
+
+    matrice* tmp1 = zeros(reseau->neuronnes_activ[L-1]->lignes,reseau->neuronnes_activ[L-1]->colonnes);
+    matrice* tmp2 = zeros(reseau->neuronnes_activ[L-1]->lignes,reseau->neuronnes_activ[L-1]->colonnes);
+    copy(reseau->neuronnes_somme[L-1],tmp2);
+    dCOST(reseau->neuronnes_activ[L-1],obj,tmp1);
+
+
+
+    switch (OUTPUTLAYER)
+        {
+            case 1:
+                mat_RELU_d(reseau->neuronnes_somme[L-1],tmp2);
+                break;
+            case 2:
+                mat_sigmoid_d(reseau->neuronnes_somme[L-1],tmp2);
+                break;
+            case 3:
+                mat_SOFT_MAX_d(reseau->neuronnes_somme[L-1],tmp2);
+                break;
+            default:
+                printf("OUTPUT pas defini backprop\n");
+                exit(EXIT_FAILURE);
+                break;
+        }
+    hadamar(tmp1,tmp2,reseau->dneuronnes[L-1]);
+    free_mat(tmp1);
+    free_mat(tmp2);
+    
+    matrice* tmp;
+    void* r_tmp;
+    pthread_t th_tmp;
+    structparbackprop tmp_struct;
+    tmp_struct.reseau = reseau;
+    for (int i = L-2; i > 0; i--){
+        tmp_struct.l = i;
+
+        pthread_create(&th_tmp,NULL,bp_tmp_aux,&tmp_struct);
+
+        matrice* derivs = zeros(reseau->neuronnes_parcouche[i],1);
+
+        switch (MIDLAYER)
+        {
+            case 1:
+                mat_RELU_d(reseau->neuronnes_somme[i],derivs);
+                break;
+            case 2:
+                mat_sigmoid_d(reseau->neuronnes_somme[i],derivs);
+                break;
+            case 3:
+                mat_SOFT_MAX_d(reseau->neuronnes_somme[i],derivs);
+                break;
+
+            default:
+                printf("MIDLAYER pas defini backprop\n");
+                exit(EXIT_FAILURE);
+                break;
+        }
+
+        pthread_join(th_tmp,&r_tmp);
+        tmp = (matrice*)r_tmp;
+        hadamar(tmp,derivs,reseau->dneuronnes[i]);
+        
+        free_mat(tmp);
+        free_mat(derivs);
+    }
+    
+    for(int l=1;l<L;l++){
+        matrice* tr_a = transpose(reseau->neuronnes_activ[l - 1]);
+        dot_par(reseau->dneuronnes[l], tr_a, reseau->dpoids[l - 1]);
+        copy(reseau->dneuronnes[l], reseau->dbiais[l - 1]);
+        free_mat(tr_a);
+    }
+    maj_reseau_opt(opt,reseau);
 }

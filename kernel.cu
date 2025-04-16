@@ -21,6 +21,7 @@ __global__ void cuda_dot(
         float somme = 0.0;
 
         // Calcul du produit scalaire pour C[ligne, colonne]
+        #pragma unroll
         for (int i = 0; i < colonnes_A; i++) { // colonnes_A == lignes_B
             somme += A[ligne * colonnes_A + i] * B[i * colonnes_B + colonne];
         }
@@ -29,6 +30,7 @@ __global__ void cuda_dot(
         C[ligne * colonnes_C + colonne] = somme;
     }
 }
+
 
 
 __global__ void cuda_hadamard(float* A,float* B,float* C,int lignes,int colonnes){
@@ -111,4 +113,20 @@ __global__ void cuda_cout(float* A, float* B, int taille, float* res){
     int i = blockDim.x*blockIdx.x + threadIdx.x;
     if(i<taille)
         atomicAdd(res,(A[i]-B[i])*(A[i]-B[i]));
+}
+
+
+
+__global__ void cuda_diff_avec_constante(float* A,float* B,float* C,int lignes,int colonnes,float alpha){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    if(i<lignes*colonnes)
+        C[i] = A[i] - alpha*B[i];
+}
+
+__global__ void cuda_apply_momentum(float* V,float* B, float beta, int taille){
+    int i = blockDim.x*blockIdx.x + threadIdx.x;
+    
+    if(i<taille){
+        V[i]= beta*V[i] + (1-beta)*B[i];
+    }
 }

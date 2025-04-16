@@ -111,12 +111,29 @@ matrice** creationtests_xor() {
     return tests;
 }
 
+int test_perf(){
+    data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
+    data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
+    int n = t_test->colonnes*t_test->lignes;
+    matrice** obj = get_obj(10);
+    neural_network* reseau = cree_reseau(3,n,800,10);
+
+    // t_train->Nombre_image
+    printf("debut\n");
+    for (int i = 0; i <5000; i++)
+    {
+        propagation_avant(reseau,t_train->cur_data[i].data);
+        propagation_arriere(reseau,obj[t_train->cur_data[i].label]);
+    }
+    
+    return 0.;
+}
 
 void test_xor(){
     neural_network* reseau = cree_reseau(3,2,4,1);
     matrice** ressources = creationressources_xor();
     matrice** test= creationtests_xor();
-
+    reseau->vitesse_apprentissage=0.01;
     for(int i=0;i<1000000;i++){
         int k = rand()%4;
 
@@ -195,23 +212,32 @@ void testtranspose(){
     print_mat(A);
 }
 
-void melange_Fisher(data* data,int N){}
+void melange_Fisher(data* tab,int N){
+    // Parcours du tableau de la fin au début
+    for (int i = N-1; i > 0; i--)
+    {
+        int j = rand() % (i + 1);
+        data temp = tab[i];
+        tab[i] = tab[j];
+        tab[j] = temp;
+    }
+    
+}
 
 float train_and_test_MNIST(){
     data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
     data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
     int n = t_test->colonnes*t_test->lignes;
-    int k=0;
     matrice** obj = get_obj(10);
-    neural_network* reseau = importer("MNIST.nn");
-    if(reseau==NULL){
-        reseau = cree_reseau(4,n,800,800,10);
-    }
+    neural_network* reseau = cree_reseau(3,n,800,10);
+    
+    int k=0;
     while (true)
     {
-        save_neural_network(reseau,"MNIST.nn");
         int* wins = (int*)calloc(10,sizeof(int));
-        for (int i = 0; i < t_train->Nombre_image; i++)
+        // t_train->Nombre_image
+        printf("debut\n");
+        for (int i = 0; i <t_train->Nombre_image; i++)
         {
             propagation_avant(reseau,t_train->cur_data[i].data);
             propagation_arriere(reseau,obj[t_train->cur_data[i].label]);
@@ -232,7 +258,11 @@ float train_and_test_MNIST(){
         afficher_tableau(wins,10);
         fflush(stdout);
         free(wins);
+        melange_Fisher(t_train->cur_data,t_train->Nombre_image);
         k++;
+        if(k==2){
+            break;
+        }
     }
     return 0.;
 }
@@ -263,4 +293,45 @@ void test_impnn(){
     reseau = importer("salut.nn");
     save_neural_network(reseau,"hey.nn");
 
+}
+
+float train_and_test_MNIST_opt(){
+    data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
+    data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
+    int n = t_test->colonnes*t_test->lignes;
+    matrice** obj = get_obj(10);
+    neural_network* reseau= cree_reseau(3,n,800,10);
+    optimizer* opt = creer_optimizer(1,reseau,0.99,0);
+    int k=0;
+    while (true)
+    {
+        int* wins = (int*)calloc(10,sizeof(int));
+        // t_train->Nombre_image
+        printf("debut\n");
+        for (int i = 0; i <t_train->Nombre_image; i++)
+        {
+            propagation_avant(reseau,t_train->cur_data[i].data);
+            propagation_arriere_opt(opt,reseau,obj[t_train->cur_data[i].label]);
+        }
+        float sum = 0;
+        int win =0;
+        for (int i = 0; i < t_test->Nombre_image; i++)
+        {
+            propagation_avant(reseau,t_test->cur_data[i].data);
+            int val= obtenir_resultat(reseau).indice == t_test->cur_data[i].label ? 1 : 0;
+            win += val;
+            wins[t_test->cur_data[i].label]+=val;
+            sum+=cout(reseau,obj[t_test->cur_data[i].label]);   
+        }
+        printf("gen: %d\n",k);
+        printf("MSE: %lf \n",sum/(float)t_test->Nombre_image);
+        printf("winrate: %lf %\n",(float)win/((float)t_test->Nombre_image)*100.);
+        afficher_tableau(wins,10);
+        fflush(stdout);
+        free(wins);
+        melange_Fisher(t_train->cur_data,t_train->Nombre_image);
+        k++;
+
+    }
+    return 0.;
 }
