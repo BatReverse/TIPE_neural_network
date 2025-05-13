@@ -536,6 +536,8 @@ optimizer* creer_optimizer(int type,neural_network* reseau,float Beta1,float Bet
     optimizer* res = (optimizer*)malloc(sizeof(optimizer));
     res->Beta1 = Beta1;
     res->Beta2 = Beta2;
+    res->Beta1t=1;
+    res->Beta2t=1;
     res->epsilon = 1e-8f;
     res->type = type;
     int L = reseau->nombre_couche;
@@ -613,8 +615,12 @@ void maj_reseau_opt(optimizer* opt,neural_network* reseau){
             break;
         
         case Adam:
-
             
+            apply_adam(opt,reseau->poids[l],reseau->biais[l],l,reseau->dpoids[l],reseau->dbiais[l],reseau->vitesse_apprentissage);
+            
+            opt->iteration++;
+
+            break;
         default:
             break;
         }
@@ -700,4 +706,11 @@ void propagation_arriere_opt(optimizer* opt, neural_network* reseau,matrice* obj
         free_mat(tr_a);
     }
     maj_reseau_opt(opt,reseau);
+}
+
+
+neural_network* copy_neural_network(neural_network* reseau){
+    //copie le reseau de neuronne
+    neural_network* res = (neural_network*)malloc(sizeof(neural_network));
+    return res;
 }

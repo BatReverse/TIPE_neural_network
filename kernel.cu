@@ -130,3 +130,31 @@ __global__ void cuda_apply_momentum(float* V,float* B, float beta, int taille){
         V[i]= beta*V[i] + (1-beta)*B[i];
     }
 }
+
+__global__ void cuda_adam_apply_momentum(float* M,float Beta1,float* grad,int N){
+    int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i<N){
+        M[i] = Beta1 * M[i] + (1-Beta1)*grad[i];
+    }
+}
+
+__global__ void cuda_adam_apply_speed(float* V,float Beta2,float* grad,int N){
+    int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i<N){
+        V[i] = Beta2 * V[i] + (1-Beta2)*grad[i]*grad[i];
+    }
+}
+
+__global__ void cuda_adam_apply_hat(float* Vc,float* V, float Betat,int N){
+    int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i<N){
+        Vc[i] = V[i]/(1-Betat);
+    }
+}
+
+__global__ void cuda_adam_apply_weight(float* W,float learning_rate,float* Mc,float* Vc,float eplsilon,int N){
+    int i = blockIdx.x*blockDim.x + threadIdx.x;
+    if(i<N){
+        W[i] = W[i]-learning_rate*Mc[i]/(sqrt(Vc[i])+eplsilon);
+    }
+}

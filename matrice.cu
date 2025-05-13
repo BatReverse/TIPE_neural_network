@@ -1,6 +1,8 @@
 #include"matrice.h"
+#include"neural_network.h"
 #include<stdio.h>
 #include"kernel.cu"
+
 matrice* zeros(int lignes, int colonnes) {
     matrice* res;
 
@@ -72,11 +74,11 @@ void print_mat(matrice* mat_device) {
 }
 
 void dot_par(matrice* A, matrice* B, matrice* C) {
-    // if (A->colonnes != B->lignes || C->lignes != A->lignes || C->colonnes != B->colonnes) {
-    //     printf("Erreur : Dimensions incompatibles pour le produit matriciel (A: %dx%d, B: %dx%d, C: %dx%d).\n",
-    //            A->lignes, A->colonnes, B->lignes, B->colonnes, C->lignes, C->colonnes);
-    //     exit(EXIT_FAILURE);
-    // }
+    if (A->colonnes != B->lignes || C->lignes != A->lignes || C->colonnes != B->colonnes) {
+        printf("Erreur : Dimensions incompatibles pour le produit matriciel (A: %dx%d, B: %dx%d, C: %dx%d).\n",
+               A->lignes, A->colonnes, B->lignes, B->colonnes, C->lignes, C->colonnes);
+        exit(EXIT_FAILURE);
+    }
 
     // Définition des dimensions du bloc et de la grille pour CUDA
     dim3 blockDim(Nl, Nl);
@@ -84,10 +86,10 @@ void dot_par(matrice* A, matrice* B, matrice* C) {
                  (C->lignes + blockDim.y - 1) / blockDim.y);
 
     // Vérification des dimensions de la grille et du bloc
-    // if (gridDim.x == 0 || blockDim.x == 0) {
-    //     printf("Erreur : Dimensions de la grille ou du bloc invalides.\n");
-    //     return;
-    // }
+    if (gridDim.x == 0 || blockDim.x == 0) {
+        printf("Erreur : Dimensions de la grille ou du bloc invalides.\n");
+        return;
+    }
 
     // Lancement du kernel de multiplication matricielle
     cuda_dot<<<gridDim, blockDim>>>(A->data, A->lignes, A->colonnes, 
@@ -95,18 +97,18 @@ void dot_par(matrice* A, matrice* B, matrice* C) {
                                     C->data, C->lignes, C->colonnes);
 
     // Vérification des erreurs CUDA après le lancement du kernel
-    // cudaError_t err = cudaGetLastError();
-    // if (err != cudaSuccess) {
-    //     printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
-    //     return;
-    // }
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        return;
+    }
 
-    // // Synchronisation de l'appareil pour s'assurer que l'exécution a réussi
-    // err = cudaDeviceSynchronize();
-    // if (err != cudaSuccess) {
-    //     printf("CUDA error after synchronization: %s\n", cudaGetErrorString(err));
-    //     return;
-    // }
+    // Synchronisation de l'appareil pour s'assurer que l'exécution a réussi
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        printf("CUDA error after synchronization: %s\n", cudaGetErrorString(err));
+        return;
+    }
 }
 
 
@@ -547,3 +549,6 @@ void update_momentum_velocity(matrice*V,matrice* W,float beta){
         return ;
     }
 }
+
+
+

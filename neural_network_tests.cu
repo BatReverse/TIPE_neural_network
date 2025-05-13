@@ -119,11 +119,10 @@ int test_perf(){
     neural_network* reseau = cree_reseau(3,n,800,10);
 
     // t_train->Nombre_image
-    printf("debut\n");
     for (int i = 0; i <5000; i++)
     {
         propagation_avant(reseau,t_train->cur_data[i].data);
-        propagation_arriere(reseau,obj[t_train->cur_data[i].label]);
+        // propagation_arriere(reseau,obj[t_train->cur_data[i].label]);
     }
     
     return 0.;
@@ -229,7 +228,7 @@ float train_and_test_MNIST(){
     data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
     int n = t_test->colonnes*t_test->lignes;
     matrice** obj = get_obj(10);
-    neural_network* reseau = cree_reseau(3,n,800,10);
+    neural_network* reseau = cree_reseau(7,n,2500,2000,1500,1000,500,10);
     
     int k=0;
     while (true)
@@ -301,10 +300,12 @@ float train_and_test_MNIST_opt(){
     int n = t_test->colonnes*t_test->lignes;
     matrice** obj = get_obj(10);
     neural_network* reseau= cree_reseau(3,n,800,10);
-    optimizer* opt = creer_optimizer(1,reseau,0.99,0);
+    reseau->vitesse_apprentissage = 0.001;
+    optimizer* opt = creer_optimizer(Adam,reseau,0.9,0.99);
     int k=0;
     while (true)
     {
+        save_neural_network(reseau,"mnistDNN.nn");
         int* wins = (int*)calloc(10,sizeof(int));
         // t_train->Nombre_image
         printf("debut\n");

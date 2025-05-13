@@ -1,8 +1,11 @@
 #ifndef NEURAL_NETWORK
 #define NEURAL_NETWORK
 
-#include"matrice.h"
 #include <stdarg.h>
+#include"matrice.h"
+#include"optimizer.h"
+
+
 //TODO faire tout
 
 //1 RELU, 2 sigmoid, 3 softmax
@@ -33,37 +36,6 @@ struct result
     float valeur;
 };
 typedef struct result result;
-
-#define Rien 0
-#define Momentum 1
-#define Adam 2
-
-struct optimizer{
-    //rien, adam ou momentum 
-    int type;
-    // V pour les poids
-    matrice** Vw;
-    //V avec le chapeau
-    matrice** Vcw;
-    // V pour les biais
-    matrice** Vb;
-    //V avec le chapeau
-    matrice** Vcb;
-    
-    matrice** Mw;
-    matrice** Mcw;
-    matrice** Mb;
-    matrice** Mcb;
-
-    float Beta1;
-    float Beta2;
-    float epsilon;
-
-    //utile pour adam
-    int iteration;
-};
-typedef struct  optimize optimzer;
-
 
 optimizer* creer_optimizer(int type,neural_network* reseau,float Beta1,float Beta2);
 

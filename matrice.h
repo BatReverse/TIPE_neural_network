@@ -8,6 +8,7 @@ struct matrice
     int colonnes;
     float* data;
 };
+typedef struct matrice matrice;
 
 
 matrice* zeros(int lignes, int colonnes);
@@ -44,4 +45,6 @@ void multiply(matrice* A,float lambda);
 
 void diff_avec_constante(matrice* A,matrice* B,matrice* C,float alpha);
 void update_momentum_velocity(matrice*V,matrice* W,float beta);
+
+
 #endif
