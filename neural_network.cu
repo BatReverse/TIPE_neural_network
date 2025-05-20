@@ -3,6 +3,12 @@
 #include"matrice.h"
 #include <pthread.h>
 #include"kernel.h"
+#include<stdarg.h>
+#include"Pile.h"
+#include"semaphore.h"
+#include"MNIST_manager.h"
+#include"assert.h"
+
 typedef struct nn_thread{
     int i;
     matrice* mat;
@@ -190,7 +196,8 @@ void* bp_tmp_aux(void* res){
     pthread_exit(tmp);
 }
 
-void propagation_arriere(neural_network* reseau,matrice* obj){
+
+void calcul_grad(neural_network* reseau,matrice* obj){
     int L = reseau->nombre_couche;
     reset_nn(reseau);
 
@@ -198,7 +205,6 @@ void propagation_arriere(neural_network* reseau,matrice* obj){
     matrice* tmp2 = zeros(reseau->neuronnes_activ[L-1]->lignes,reseau->neuronnes_activ[L-1]->colonnes);
     copy(reseau->neuronnes_somme[L-1],tmp2);
     dCOST(reseau->neuronnes_activ[L-1],obj,tmp1);
-
 
 
     switch (OUTPUTLAYER)
@@ -265,7 +271,10 @@ void propagation_arriere(neural_network* reseau,matrice* obj){
         copy(reseau->dneuronnes[l], reseau->dbiais[l - 1]);
         free_mat(tr_a);
     }
-    // print_mat(reseau->dbiais[0]);
+}
+
+void propagation_arriere(neural_network* reseau,matrice* obj){
+    calcul_grad(reseau,obj);
     maj_reseau(reseau);
 }
 
@@ -347,7 +356,7 @@ void save_neural_network(neural_network* reseau,char* filename){
 }
 
 neural_network* importer(char* filename) {
-
+    //generer par IA 
     FILE* file = fopen(filename, "r");
     if (file == NULL) {
         printf("Creation d'un nouveau fichier neuralnetwork\n");
@@ -631,86 +640,172 @@ void maj_reseau_opt(optimizer* opt,neural_network* reseau){
 }
 
 void propagation_arriere_opt(optimizer* opt, neural_network* reseau,matrice* obj){
-    int L = reseau->nombre_couche;
-    reset_nn(reseau);
-
-    matrice* tmp1 = zeros(reseau->neuronnes_activ[L-1]->lignes,reseau->neuronnes_activ[L-1]->colonnes);
-    matrice* tmp2 = zeros(reseau->neuronnes_activ[L-1]->lignes,reseau->neuronnes_activ[L-1]->colonnes);
-    copy(reseau->neuronnes_somme[L-1],tmp2);
-    dCOST(reseau->neuronnes_activ[L-1],obj,tmp1);
-
-
-
-    switch (OUTPUTLAYER)
-        {
-            case 1:
-                mat_RELU_d(reseau->neuronnes_somme[L-1],tmp2);
-                break;
-            case 2:
-                mat_sigmoid_d(reseau->neuronnes_somme[L-1],tmp2);
-                break;
-            case 3:
-                mat_SOFT_MAX_d(reseau->neuronnes_somme[L-1],tmp2);
-                break;
-            default:
-                printf("OUTPUT pas defini backprop\n");
-                exit(EXIT_FAILURE);
-                break;
-        }
-    hadamar(tmp1,tmp2,reseau->dneuronnes[L-1]);
-    free_mat(tmp1);
-    free_mat(tmp2);
-    
-    matrice* tmp;
-    void* r_tmp;
-    pthread_t th_tmp;
-    structparbackprop tmp_struct;
-    tmp_struct.reseau = reseau;
-    for (int i = L-2; i > 0; i--){
-        tmp_struct.l = i;
-
-        pthread_create(&th_tmp,NULL,bp_tmp_aux,&tmp_struct);
-
-        matrice* derivs = zeros(reseau->neuronnes_parcouche[i],1);
-
-        switch (MIDLAYER)
-        {
-            case 1:
-                mat_RELU_d(reseau->neuronnes_somme[i],derivs);
-                break;
-            case 2:
-                mat_sigmoid_d(reseau->neuronnes_somme[i],derivs);
-                break;
-            case 3:
-                mat_SOFT_MAX_d(reseau->neuronnes_somme[i],derivs);
-                break;
-
-            default:
-                printf("MIDLAYER pas defini backprop\n");
-                exit(EXIT_FAILURE);
-                break;
-        }
-
-        pthread_join(th_tmp,&r_tmp);
-        tmp = (matrice*)r_tmp;
-        hadamar(tmp,derivs,reseau->dneuronnes[i]);
-        
-        free_mat(tmp);
-        free_mat(derivs);
-    }
-    
-    for(int l=1;l<L;l++){
-        matrice* tr_a = transpose(reseau->neuronnes_activ[l - 1]);
-        dot_par(reseau->dneuronnes[l], tr_a, reseau->dpoids[l - 1]);
-        copy(reseau->dneuronnes[l], reseau->dbiais[l - 1]);
-        free_mat(tr_a);
-    }
+    calcul_grad(reseau,obj);
     maj_reseau_opt(opt,reseau);
 }
 
+typedef struct batch_t{
+    pthread_mutex_t* mutex_pile;
+    pthread_mutex_t* mutex_poids;
+    pile* p;
+    
+    matrice* nourriture;
+    matrice* obj;
+    matrice** dpoids;
+    matrice** dbiais;
+}  batch_t;
 
-neural_network* copy_neural_network(neural_network* reseau){
-    //copie le reseau de neuronne
+sem_t semaphore;
+
+void* batch_training_aux(void* res){
+    batch_t* tmp = (batch_t*)res;
+    neural_network* reseau;
+
+    sem_wait(&semaphore);
+
+    pthread_mutex_lock(tmp->mutex_pile);
+        reseau = pop(&(tmp->p));
+    pthread_mutex_unlock(tmp->mutex_pile);
+
+    propagation_avant(reseau,tmp->nourriture);
+    assert(tmp->obj!=NULL);
+    calcul_grad(reseau,tmp->obj);
+
+    pthread_mutex_lock(tmp->mutex_poids);
+    for (int i = 0; i < reseau->nombre_couche-1; i++)
+    {
+        sum(tmp->dpoids[i],reseau->dpoids[i],tmp->dpoids[i]);
+        sum(tmp->dbiais[i],reseau->dbiais[i],tmp->dbiais[i]);
+    }
+    pthread_mutex_unlock(tmp->mutex_poids);
+    
+    pthread_mutex_lock(tmp->mutex_pile);
+        empiler(&(tmp->p),reseau);
+    pthread_mutex_unlock(tmp->mutex_pile);
+
+    sem_post(&semaphore);
+
+    
+    return NULL;
+}
+
+
+
+
+void batch_training(int debut,int batch_size,data* nourriture,matrice** obj, int N,neural_network* reseau,pile* p){
+    pthread_t threads[batch_size];
+    pthread_mutex_t mutex_pile;
+    pthread_mutex_t mutex_poids;
+
+    pthread_mutex_init(&mutex_pile, NULL);   // ✅ initialise les mutex
+    pthread_mutex_init(&mutex_poids, NULL);
+    sem_init(&semaphore, PTHREAD_PROCESS_SHARED, THREAD_MAX);
+
+    for(int i = debut; i<debut+batch_size && i<N; i++){
+        batch_t* tmp = (batch_t*)malloc(sizeof(batch_t));
+        tmp->mutex_poids = &mutex_poids;
+        tmp->mutex_pile = &mutex_pile;
+        tmp->nourriture= nourriture[i].data;
+        tmp->obj = obj[nourriture[i].label];
+
+        tmp->dpoids = reseau->dpoids;
+        tmp->dbiais = reseau->dbiais;
+        tmp->p = p;
+        pthread_create(&threads[i-debut], NULL, batch_training_aux, tmp);
+    }
+
+    for(int i = debut; i<debut+batch_size && i<N; i++){
+        pthread_join(threads[i-debut], NULL);
+    }
+    for (int i = 0; i < reseau->nombre_couche-1; i++){
+        multiply(reseau->dpoids[i],1/batch_size);
+        multiply(reseau->dbiais[i],1/batch_size);
+    }
+        pthread_mutex_destroy(&mutex_pile);     // ✅ destruction des mutex
+    pthread_mutex_destroy(&mutex_poids);
+        sem_destroy(&semaphore);
+    printf("fin batch\n");
+}
+
+neural_network* copy_neural_network(neural_network* reseau) {
+    if (reseau == NULL) {
+        fprintf(stderr, "Erreur: réseau source est NULL\n");
+        return NULL;
+    }
+
     neural_network* res = (neural_network*)malloc(sizeof(neural_network));
+    if (res == NULL) {
+        fprintf(stderr, "Erreur d'allocation pour la structure réseau\n");
+        return NULL;
+    }
+
+    // Copie des membres simples
+    res->nombre_couche = reseau->nombre_couche;
+    res->vitesse_apprentissage = reseau->vitesse_apprentissage;
+
+    // Allocation des tableaux
+    res->neuronnes_parcouche = (int*)malloc(sizeof(int) * res->nombre_couche);
+    res->neuronnes_somme = (matrice**)malloc(sizeof(matrice*) * res->nombre_couche);
+    res->neuronnes_activ = (matrice**)malloc(sizeof(matrice*) * res->nombre_couche);
+    res->poids = (matrice**)malloc(sizeof(matrice*) * res->nombre_couche);
+    res->biais = (matrice**)malloc(sizeof(matrice*) * res->nombre_couche);
+    res->dpoids = (matrice**)malloc(sizeof(matrice*) * res->nombre_couche);
+    res->dbiais = (matrice**)malloc(sizeof(matrice*) * res->nombre_couche);
+    res->dneuronnes = (matrice**)malloc(sizeof(matrice*) * res->nombre_couche);
+
+    // Vérification des allocations
+    if (!res->neuronnes_parcouche || !res->neuronnes_somme || !res->neuronnes_activ || 
+        !res->poids || !res->biais || !res->dpoids || !res->dbiais || !res->dneuronnes) {
+        fprintf(stderr, "Erreur d'allocation mémoire pour les tableaux\n");
+        return NULL;
+    }
+
+    // Copie profonde couche par couche
+    for (int i = 0; i < res->nombre_couche; i++) {
+        res->neuronnes_parcouche[i] = reseau->neuronnes_parcouche[i];
+
+        // Copie des matrices
+        if(i>0){
+            res->neuronnes_activ[i] = copy_new(reseau->neuronnes_activ[i]);
+            res->neuronnes_somme[i] = copy_new(reseau->neuronnes_somme[i]);
+        }
+        res->dneuronnes[i] = copy_new(reseau->dneuronnes[i]);
+
+
+        // Pour la dernière couche, on ne copie pas poids/biais (si c'est bien le cas)
+        if (i < res->nombre_couche - 1) {
+
+            res->poids[i] = copy_new(reseau->poids[i]);
+            res->biais[i] = copy_new(reseau->biais[i]);
+            res->dpoids[i] = copy_new(reseau->dpoids[i]);
+            res->dbiais[i] = copy_new(reseau->dbiais[i]);
+        }
+
+    }
+
     return res;
+}
+
+void liberer_reseau(neural_network* reseau){
+    free(reseau->neuronnes_parcouche);
+    for (int i = 0; i < reseau->nombre_couche; i++) {
+
+        // Copie des matrices
+        if(i>0){
+            free_mat(reseau->neuronnes_activ[i]);
+            free_mat(reseau->neuronnes_somme[i]);
+        }
+        free_mat(reseau->dneuronnes[i]);
+
+
+        // Pour la dernière couche, on ne copie pas poids/biais (si c'est bien le cas)
+        if (i < reseau->nombre_couche - 1) {
+
+            free_mat(reseau->poids[i]);
+            free_mat(reseau->biais[i]);
+            free_mat(reseau->dpoids[i]);
+            free_mat(reseau->dbiais[i]);
+        }
+    }
+    free(reseau);
 }

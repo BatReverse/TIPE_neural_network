@@ -23,7 +23,7 @@ void apply_adam(optimizer* opt,matrice* W,matrice* biais,int l,matrice* dW,matri
 
     // Vérifiez les erreurs CUDA après le lancement du kernel
     if (err != cudaSuccess) {
-        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        printf("CUDA error after kernel launch adam: %s\n", cudaGetErrorString(err));
         return ;
     }
 

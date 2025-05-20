@@ -99,7 +99,7 @@ void dot_par(matrice* A, matrice* B, matrice* C) {
     // Vérification des erreurs CUDA après le lancement du kernel
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
-        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        printf("CUDA error after kernel launch dot: %s\n", cudaGetErrorString(err));
         return;
     }
 
@@ -131,7 +131,7 @@ void hadamar(matrice* A,matrice* B,matrice *C){
     
     // Vérifiez les erreurs CUDA après le lancement du kernel
     if (err != cudaSuccess) {
-        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        printf("CUDA error after kernel launch hadamar: %s\n", cudaGetErrorString(err));
         return ;
     }
 
@@ -162,7 +162,7 @@ if(A->colonnes != B->colonnes || A->lignes != B->lignes ||
     
     // Vérifiez les erreurs CUDA après le lancement du kernel
     if (err != cudaSuccess) {
-        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        printf("CUDA error after kernel launch sum: %s\n", cudaGetErrorString(err));
         return ;
     }
 
@@ -195,7 +195,7 @@ void diff(matrice* A,matrice* B,matrice* C){
     
     // Vérifiez les erreurs CUDA après le lancement du kernel
     if (err != cudaSuccess) {
-        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        printf("CUDA error after kernel launch diff: %s\n", cudaGetErrorString(err));
         return ;
     }
 
@@ -228,7 +228,7 @@ void diff_avec_constante(matrice* A,matrice* B,matrice* C,float alpha){
     
     // Vérifiez les erreurs CUDA après le lancement du kernel
     if (err != cudaSuccess) {
-        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        printf("CUDA error after kernel launch diff cst: %s\n", cudaGetErrorString(err));
         return ;
     }
 
@@ -263,7 +263,7 @@ matrice* transpose(matrice* A) {
     err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("A: %dx%d\n",A->colonnes,A->lignes);
-        printf("transpose CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        printf("transpose CUDA error after kernel launch transpose: %s\n", cudaGetErrorString(err));
         return NULL;
     }
 
@@ -285,9 +285,50 @@ void copy(matrice* A,matrice* C){
     cudaMemcpy(C->data,A->data,sizeof(float)*A->lignes*A->colonnes,cudaMemcpyDeviceToDevice);
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
-        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        printf("CUDA error after kernel launch copy: %s\n", cudaGetErrorString(err));
         return ;
     }
+}
+
+matrice* copy_new( matrice* A) {
+    // Vérification de l'entrée
+    if (A == NULL || A->data == NULL) {
+        fprintf(stderr, "Erreur: Matrice source invalide\n");
+        exit(EXIT_FAILURE);
+        return NULL;
+    }
+
+    // Allocation structure
+    matrice* res = (matrice*)malloc(sizeof(matrice));
+    if (res == NULL) {
+        fprintf(stderr, "Erreur: Allocation CPU échouée\n");
+        return NULL;
+    }
+
+    // Copie métadonnées
+    res->lignes = A->lignes;
+    res->colonnes = A->colonnes;
+    res->data = NULL;
+
+    // Allocation GPU
+    size_t size = res->lignes * res->colonnes * sizeof(float);
+    cudaError_t err = cudaMalloc(&res->data, size);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Erreur CUDA: %s\n", cudaGetErrorString(err));
+        free(res);
+        return NULL;
+    }
+
+    // Copie des données
+    err = cudaMemcpy(res->data, A->data, size, cudaMemcpyDeviceToDevice);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Erreur copie CUDA: %s\n", cudaGetErrorString(err));
+        cudaFree(res->data);
+        free(res);
+        return NULL;
+    }
+
+    return res;
 }
 
 void mat_RELU(matrice* A,matrice* C){
@@ -457,11 +498,25 @@ void mat_SOFT_MAX_d(matrice*A,matrice* C){
 }
 
 void dCOST(matrice* A,matrice* obj,matrice* C){
-    if(A->colonnes != obj->colonnes || A->lignes != obj->lignes ||
-       A->colonnes != C->colonnes || A->lignes != C->lignes){
-        printf("dcost invalide");
-        exit(EXIT_FAILURE);
+    if (A->colonnes != obj->colonnes || A->lignes != obj->lignes ||
+    A->colonnes != C->colonnes || A->lignes != C->lignes) {
+    
+    // Vérification détaillée pour afficher la cause exacte
+    if (A->colonnes != obj->colonnes) {
+        printf("Erreur : Le nombre de colonnes de A (%d) ne correspond pas à celui de obj (%d)\n", A->colonnes, obj->colonnes);
     }
+    if (A->lignes != obj->lignes) {
+        printf("Erreur : Le nombre de lignes de A (%d) ne correspond pas à celui de obj (%d)\n", A->lignes, obj->lignes);
+    }
+    if (A->colonnes != C->colonnes) {
+        printf("Erreur : Le nombre de colonnes de A (%d) ne correspond pas à celui de C (%d)\n", A->colonnes, C->colonnes);
+    }
+    if (A->lignes != C->lignes) {
+        printf("Erreur : Le nombre de lignes de A (%d) ne correspond pas à celui de C (%d)\n", A->lignes, C->lignes);
+    }
+    
+    exit(EXIT_FAILURE);
+}
     dim3 blockDim(Nl);
     dim3 gridDim((C->colonnes*C->lignes+blockDim.x - 1)/blockDim.x);
 
@@ -538,7 +593,7 @@ void update_momentum_velocity(matrice*V,matrice* W,float beta){
     
     // Vérifiez les erreurs CUDA après le lancement du kernel
     if (err != cudaSuccess) {
-        printf("CUDA error after kernel launch: %s\n", cudaGetErrorString(err));
+        printf("CUDA error after kernel launch momementu: %s\n", cudaGetErrorString(err));
         return ;
     }
 

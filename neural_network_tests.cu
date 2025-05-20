@@ -5,6 +5,7 @@
 #include"MNIST_manager.h"
 #include<stdbool.h>
 #include"inttypes.h"
+#include"Pile.h"
 #include<stdlib.h>
 #include<unistd.h>
 
@@ -295,6 +296,7 @@ void test_impnn(){
 }
 
 float train_and_test_MNIST_opt(){
+
     data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
     data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
     int n = t_test->colonnes*t_test->lignes;
@@ -335,4 +337,71 @@ float train_and_test_MNIST_opt(){
 
     }
     return 0.;
+}
+
+void train_and_test_MNIST_batch(){
+    data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
+    data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
+    int n = t_test->colonnes*t_test->lignes;
+    matrice** obj = get_obj(10);
+    neural_network* reseau= cree_reseau(3,n,800,10);
+    reseau->vitesse_apprentissage = 0.001;
+    optimizer* opt = creer_optimizer(Adam,reseau,0.9,0.99);
+    int batch_size = 100;
+    int k=0;
+    pile* p = NULL;
+        printf("debut \n");
+
+    for (int i = 0; i < THREAD_MAX; i++)
+    {
+        empiler(&p,copy_neural_network(reseau));
+    }
+    
+    while (true)
+    {
+        int* wins = (int*)calloc(10,sizeof(int));
+        // t_train->Nombre_image
+        printf("debut \n");
+        for (int i = 0; i <t_train->Nombre_image; i+=batch_size)
+        {
+            batch_training(i,batch_size,t_train->cur_data,obj,t_train->Nombre_image,reseau,p);
+            maj_reseau_opt(opt,reseau);
+            update_pile(p,reseau->poids,reseau->biais);
+            printf("%d \n",i);
+            // propagation_avant(reseau,t_train->cur_data[i].data);
+            // propagation_arriere_opt(opt,reseau,obj[t_train->cur_data[i].label]);
+        }
+                float sum = 0;
+        int win =0;
+        for (int i = 0; i < t_test->Nombre_image; i++)
+        {
+            propagation_avant(reseau,t_test->cur_data[i].data);
+            int val= obtenir_resultat(reseau).indice == t_test->cur_data[i].label ? 1 : 0;
+            win += val;
+            wins[t_test->cur_data[i].label]+=val;
+            sum+=cout(reseau,obj[t_test->cur_data[i].label]);   
+        }
+        printf("gen: %d\n",k);
+        printf("MSE: %lf \n",sum/(float)t_test->Nombre_image);
+        printf("winrate: %lf %\n",(float)win/((float)t_test->Nombre_image)*100.);
+        afficher_tableau(wins,10);
+        fflush(stdout);
+        free(wins);
+        melange_Fisher(t_train->cur_data,t_train->Nombre_image);
+        k++;
+    }
+}
+
+void test_copy_neural_network(){
+    neural_network* reseau = cree_reseau(4,50,80,80,10);
+    printf("aa\n");
+    save_neural_network(reseau,"k.nn");
+    printf("aa\n");
+
+    reseau = copy_neural_network(reseau);
+
+    printf("aa\n");
+    save_neural_network(reseau,"kk.nn");
+    printf("aa\n");
+
 }

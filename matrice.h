@@ -46,5 +46,5 @@ void multiply(matrice* A,float lambda);
 void diff_avec_constante(matrice* A,matrice* B,matrice* C,float alpha);
 void update_momentum_velocity(matrice*V,matrice* W,float beta);
 
-
+matrice* copy_new(matrice* A);
 #endif

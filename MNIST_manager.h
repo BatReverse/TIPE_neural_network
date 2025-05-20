@@ -5,9 +5,8 @@
 #include<stdio.h>
 #include"matrice.h"
 #include"inttypes.h"
-#include"activation.h"
 #include<stdlib.h>
-#include<unistd.h>
+
 struct data{
     uint8_t label;
     matrice* data;

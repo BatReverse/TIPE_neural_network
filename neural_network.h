@@ -1,10 +1,10 @@
 #ifndef NEURAL_NETWORK
 #define NEURAL_NETWORK
-
-#include <stdarg.h>
 #include"matrice.h"
 #include"optimizer.h"
+#include"MNIST_manager.h"
 
+#define THREAD_MAX 16
 
 //TODO faire tout
 
@@ -37,6 +37,7 @@ struct result
 };
 typedef struct result result;
 
+
 optimizer* creer_optimizer(int type,neural_network* reseau,float Beta1,float Beta2);
 
 void maj_reseau_opt(optimizer* opt,neural_network* reseau);
@@ -53,4 +54,7 @@ result obtenir_resultat(neural_network* reseau);
 float cout(neural_network* reseau, matrice* obj);
 void save_neural_network(neural_network* reseau,char* filename);
 neural_network* importer(char* filename);
+neural_network* copy_neural_network(neural_network* reseau);
+void liberer_reseau(neural_network* reseau);
+
 #endif
