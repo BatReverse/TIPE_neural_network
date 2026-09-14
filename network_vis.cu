@@ -1,9 +1,14 @@
+// network_vis.cu — Petit utilitaire de debug pour inspecter un réseau
+// (dimensions, poids, biais, activations) directement dans le terminal.
+// Non appelée par le flux d'entraînement principal ; utile pour vérifier
+// "à la main" l'état d'un petit réseau (ex : le test XOR).
 #include <stdio.h>
 #include"neural_network.h"
 #include"matrice.h"
 
 
-// Fonction pour afficher les détails du réseau de neurones
+// Affiche l'architecture d'un réseau ainsi que ses poids/biais/activations
+// couche par couche (via print_mat, donc coûteux : à réserver au débogage).
 void afficher_neural_network(neural_network* nn) {
     if (nn == NULL) {
         printf("Le réseau de neurones est NULL.\n");

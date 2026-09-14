@@ -1,3 +1,8 @@
+// optimizer.cu — Implémentation de l'optimiseur Adam (Kingma & Ba, 2014).
+// Les autres optimiseurs (Momentum, SGD "Rien") n'ont pas besoin de code
+// dédié ici : leurs mises à jour tiennent en un ou deux appels aux fonctions
+// génériques de matrice.cu, faits directement dans maj_reseau_opt()
+// (neural_network.cu).
 #include"optimizer.h"
 #include"kernel.h"
 #include<stdio.h>
@@ -5,6 +10,12 @@
 
 
 
+// Une étape d'Adam pour les poids/biais de la couche `l` :
+//   1. met à jour les moments d'ordre 1 (M) et 2 (V) avec le gradient courant
+//   2. calcule leur version corrigée du biais (Mc, Vc)
+//   3. applique la mise à jour finale sur W et biais
+// Beta1t/Beta2t (Beta^t) sont incrémentés ici, avant utilisation, car c'est
+// la seule fonction qui avance le numéro d'itération de l'optimiseur.
 void apply_adam(optimizer* opt,matrice* W,matrice* biais,int l,matrice* dW,matrice* dBiais,float learning_rate){
     dim3 blockDim(Nl);
     dim3 gridDimW((W->colonnes*W->lignes+blockDim.x - 1)/blockDim.x);
@@ -19,7 +30,7 @@ void apply_adam(optimizer* opt,matrice* W,matrice* biais,int l,matrice* dW,matri
 
     cuda_adam_apply_speed<<<gridDimW,blockDim>>>(opt->Vw[l]->data,opt->Beta2,dW->data,Nw);
     cuda_adam_apply_speed<<<gridDimB,blockDim>>>(opt->Vb[l]->data,opt->Beta2,dBiais->data,Nb);
-    
+
 
     // Vérifiez les erreurs CUDA après le lancement du kernel
     if (err != cudaSuccess) {

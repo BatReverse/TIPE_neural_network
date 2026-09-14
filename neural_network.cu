@@ -1,3 +1,6 @@
+// neural_network.cu — Cœur du projet : création du réseau, propagation
+// avant, rétropropagation (calcul du gradient + mise à jour des poids),
+// sérialisation sur disque, et entraînement par batch multi-threads.
 #include"neural_network.h"
 #include<stdio.h>
 #include"matrice.h"
@@ -9,6 +12,8 @@
 #include"MNIST_manager.h"
 #include"assert.h"
 
+// Non utilisé actuellement (aucune fonction ne construit/consomme de
+// nn_thread) : reliquat d'une tentative antérieure de parallélisation.
 typedef struct nn_thread{
     int i;
     matrice* mat;
@@ -16,9 +21,10 @@ typedef struct nn_thread{
 } nn_thread;
 
 
-
-
-
+// Crée un réseau de `nb_couche` couches. Les arguments variadiques suivants
+// donnent le nombre de neurones de chaque couche (ex : cree_reseau(3, 784,
+// 800, 10)). Les poids sont initialisés selon Xavier/Glorot uniforme
+// (bornes +-sqrt(6/(fan_in+fan_out))), les biais à zéro.
 neural_network* cree_reseau(int nb_couche, ...){
     va_list ap;
 
@@ -73,23 +79,18 @@ neural_network* cree_reseau(int nb_couche, ...){
     return res;
 }
 
+// Propage un vecteur d'entrée `nourriture` à travers tout le réseau :
+// neuronnes_activ[0] pointe directement sur `nourriture` (pas de copie), puis
+// chaque couche suivante calcule somme = poids*activation_précédente + biais
+// avant d'appliquer la fonction d'activation MIDLAYER. Le résultat final est
+// disponible dans reseau->neuronnes_activ[L-1].
+// (Les vérifications de NULL et de dimensions de `nourriture` ont été
+// désactivées ici pour la performance ; elles ne sont plus faites.)
 void propagation_avant(neural_network* reseau, matrice* nourriture) {
-    // if (reseau == NULL || nourriture == NULL) {
-    //     printf("Erreur : le réseau ou la matrice d'entrée est NULL.\n");
-    //     exit(EXIT_FAILURE);
-    // }
-
     int L = reseau->nombre_couche;
 
-    // // Vérification des dimensions de l'entrée
-    // if (nourriture->lignes*nourriture->colonnes != reseau->neuronnes_parcouche[0]) {
-    //     printf("Erreur : les dimensions de l'entrée (%d) ne correspondent pas à la première couche (%d).\n",
-    //            nourriture->lignes, reseau->neuronnes_parcouche[0]);
-    //     exit(EXIT_FAILURE);
-    // }
-
-    // Initialisation de la première couche
-    // copy(nourriture, reseau->neuronnes_somme[0]);
+    // Initialisation de la première couche : pas de copie, l'entrée devient
+    // directement l'activation de la couche 0.
     reseau->neuronnes_activ[0]= nourriture;
 
     // Propagation avant pour les couches suivantes
@@ -119,6 +120,8 @@ void propagation_avant(neural_network* reseau, matrice* nourriture) {
 
 
 
+// Coût quadratique (somme des carrés des écarts) entre la sortie actuelle
+// du réseau (dernière couche d'activation) et la sortie attendue `obj`.
 float cout(neural_network* reseau, matrice* obj){
     float* sum;
     cudaMalloc(&sum,sizeof(float));
@@ -153,6 +156,9 @@ float cout(neural_network* reseau, matrice* obj){
     return sum_h;
 }
 
+// Mise à jour "SGD classique" (sans optimiseur) : poids -= lr*dpoids,
+// biais -= lr*dbiais. Utilisée par propagation_arriere() ; les variantes
+// avec Momentum/Adam passent par maj_reseau_opt() à la place.
 void maj_reseau(neural_network* reseau){
     int L = reseau->nombre_couche;
     for (int l = 0; l < L-1; l++) {
@@ -164,21 +170,24 @@ void maj_reseau(neural_network* reseau){
 
 }
 
+// Remet à zéro les gradients (dbiais, dneuronnes, dpoids) avant de calculer
+// une nouvelle rétropropagation. Appelé en tout début de calcul_grad().
 void reset_nn(neural_network* res){
     for (int i = 0; i < res->nombre_couche-1; i++)
     {
         cudaMemset(res->dbiais[i]->data,0,sizeof(float)*res->dbiais[i]->lignes*res->dbiais[i]->colonnes);
         cudaMemset(res->dneuronnes[i]->data,0,sizeof(float)*res->dneuronnes[i]->lignes*res->dneuronnes[i]->colonnes);
         cudaMemset(res->dpoids[i]->data,0,sizeof(float)*res->dpoids[i]->lignes*res->dpoids[i]->colonnes);
-        
+
     }
     cudaError_t err = cudaDeviceSynchronize();
     if(err != cudaSuccess){
-        printf("aaaaaa");
+        printf("Erreur CUDA lors de la synchronisation dans reset_nn: %s\n", cudaGetErrorString(err));
     }
-    
+
 }
 
+// Arguments passés au thread lancé par calcul_grad() pour chaque couche `l`.
 struct structparbackprop_t{
     neural_network* reseau;
     int l;
@@ -186,6 +195,10 @@ struct structparbackprop_t{
 typedef struct structparbackprop_t structparbackprop;
 
 
+// Calcule transpose(poids[l]) * dneuronnes[l+1] dans un thread séparé,
+// pendant que le thread principal calcule la dérivée de l'activation de la
+// couche l (voir calcul_grad) : les deux résultats sont ensuite combinés
+// par un produit de Hadamard pour obtenir dneuronnes[l].
 void* bp_tmp_aux(void* res){
     structparbackprop* v = (structparbackprop*)res;
     int i = v->l;
@@ -197,10 +210,20 @@ void* bp_tmp_aux(void* res){
 }
 
 
+// Calcule les gradients (dpoids, dbiais, dneuronnes) de tout le réseau par
+// rétropropagation, à partir de la sortie attendue `obj`. Suppose qu'une
+// propagation_avant() a déjà été faite (neuronnes_somme/activ à jour).
+//
+// Principe : delta_L = dCOST(sortie, obj) .* activation'(somme_L) pour la
+// dernière couche, puis pour chaque couche l < L en partant de la fin :
+// delta_l = (poids_l^T * delta_{l+1}) .* activation'(somme_l).
+// Le gradient des poids de la couche l est enfin delta_{l+1} * activ_l^T,
+// et celui du biais est simplement delta_{l+1}.
 void calcul_grad(neural_network* reseau,matrice* obj){
     int L = reseau->nombre_couche;
     reset_nn(reseau);
 
+    // delta de la dernière couche : dCOST(sortie, obj) .* activation'(somme).
     matrice* tmp1 = zeros(reseau->neuronnes_activ[L-1]->lignes,reseau->neuronnes_activ[L-1]->colonnes);
     matrice* tmp2 = zeros(reseau->neuronnes_activ[L-1]->lignes,reseau->neuronnes_activ[L-1]->colonnes);
     copy(reseau->neuronnes_somme[L-1],tmp2);
@@ -227,6 +250,11 @@ void calcul_grad(neural_network* reseau,matrice* obj){
     free_mat(tmp1);
     free_mat(tmp2);
     
+    // Propage le delta vers les couches cachées, de la fin vers le début.
+    // Pour chaque couche i, le produit matriciel poids[i]^T * delta[i+1] est
+    // calculé dans un thread séparé (bp_tmp_aux) pendant que le thread
+    // principal calcule activation'(somme[i]) ; les deux sont ensuite
+    // combinés par un produit de Hadamard.
     matrice* tmp;
     void* r_tmp;
     pthread_t th_tmp;
@@ -265,6 +293,8 @@ void calcul_grad(neural_network* reseau,matrice* obj){
         free_mat(derivs);
     }
     
+    // Gradient des poids/biais à partir des deltas : dpoids[l-1] =
+    // dneuronnes[l] * activ[l-1]^T, dbiais[l-1] = dneuronnes[l].
     for(int l=1;l<L;l++){
         matrice* tr_a = transpose(reseau->neuronnes_activ[l - 1]);
         dot_par(reseau->dneuronnes[l], tr_a, reseau->dpoids[l - 1]);
@@ -273,11 +303,16 @@ void calcul_grad(neural_network* reseau,matrice* obj){
     }
 }
 
+// Rétropropagation "simple" : calcule le gradient (calcul_grad) puis met à
+// jour les poids/biais par SGD classique (maj_reseau), sans optimiseur.
 void propagation_arriere(neural_network* reseau,matrice* obj){
     calcul_grad(reseau,obj);
     maj_reseau(reseau);
 }
 
+// Renvoie l'indice du neurone de sortie le plus activé (classe prédite) et
+// sa valeur d'activation. Copie d'abord la dernière couche du GPU vers le
+// CPU pour en chercher le maximum.
 result obtenir_resultat(neural_network* reseau){
     float max = -1;
     int indice =0;
@@ -306,10 +341,13 @@ result obtenir_resultat(neural_network* reseau){
     return res;
 }
 
+// Sauvegarde l'architecture et les poids/biais de `reseau` dans un fichier
+// texte "maison" lisible par importer(). Ne sauvegarde pas les gradients
+// (dpoids/dbiais/dneuronnes), recalculés à la prochaine rétropropagation.
 void save_neural_network(neural_network* reseau,char* filename){
     //il ne sert a rien de sauvegarder le matrices de derivée partielle
     //le format est du type L \n n1 n2 n3 ...
-    //les poids et biais de chaque couche 
+    //les poids et biais de chaque couche
     //la vitesse d'apprentissage
     FILE* file = fopen(filename,"w");
 
@@ -355,8 +393,10 @@ void save_neural_network(neural_network* reseau,char* filename){
     return;
 }
 
+// Recharge un réseau depuis un fichier écrit par save_neural_network().
+// (Fonction volontairement très défensive — vérifie chaque allocation et
+// chaque lecture — générée avec l'aide d'une IA.)
 neural_network* importer(char* filename) {
-    //generer par IA 
     FILE* file = fopen(filename, "r");
     if (file == NULL) {
         printf("Creation d'un nouveau fichier neuralnetwork\n");
@@ -541,6 +581,10 @@ neural_network* importer(char* filename) {
 }
 
 
+// Alloue un optimiseur de type `type` (Rien/Momentum/Adam) et initialise à
+// zéro ses matrices auxiliaires (moments) aux dimensions des poids/biais de
+// `reseau`. Beta1/Beta2 sont les coefficients de décroissance des moments
+// (utilisés par Momentum et/ou Adam selon `type`).
 optimizer* creer_optimizer(int type,neural_network* reseau,float Beta1,float Beta2){
     optimizer* res = (optimizer*)malloc(sizeof(optimizer));
     res->Beta1 = Beta1;
@@ -605,6 +649,8 @@ optimizer* creer_optimizer(int type,neural_network* reseau,float Beta1,float Bet
     return res;
 }
 
+// Met à jour les poids/biais de chaque couche avec l'optimiseur `opt`, à
+// partir des gradients dpoids/dbiais déjà calculés par calcul_grad().
 void maj_reseau_opt(optimizer* opt,neural_network* reseau){
     int L = reseau->nombre_couche;
     for (int l = 0; l < L-1; l++) {
@@ -639,11 +685,14 @@ void maj_reseau_opt(optimizer* opt,neural_network* reseau){
     }
 }
 
+// Rétropropagation avec optimiseur : calcule le gradient (calcul_grad) puis
+// met à jour le réseau via `opt` (Momentum/Adam) au lieu du SGD classique.
 void propagation_arriere_opt(optimizer* opt, neural_network* reseau,matrice* obj){
     calcul_grad(reseau,obj);
     maj_reseau_opt(opt,reseau);
 }
 
+// Arguments passés à chaque thread de batch_training_aux().
 typedef struct batch_t{
     pthread_mutex_t* mutex_pile;
     pthread_mutex_t* mutex_poids;
@@ -655,8 +704,14 @@ typedef struct batch_t{
     matrice** dbiais;
 }  batch_t;
 
+// Limite le nombre de threads de batch actifs en même temps à THREAD_MAX
+// (voir batch_training) : évite de dépiler plus de copies de réseau que la
+// pile n'en contient.
 sem_t semaphore;
 
+// Corps d'un thread de batch : dépile une copie du réseau (protégée par
+// mutex_pile), calcule son gradient sur un exemple, accumule ce gradient
+// dans tmp->dpoids/dbiais (protégé par mutex_poids), puis rempile la copie.
 void* batch_training_aux(void* res){
     batch_t* tmp = (batch_t*)res;
     neural_network* reseau;
@@ -692,6 +747,14 @@ void* batch_training_aux(void* res){
 
 
 
+// Entraîne un batch de `batch_size` exemples en parallèle (un thread par
+// exemple, via batch_training_aux) : chaque thread accumule son gradient
+// dans reseau->dpoids/dbiais, puis on divise par batch_size pour obtenir la
+// moyenne du batch.
+// ATTENTION (bug existant, non corrigé ici) : `1/batch_size` est une
+// division entière, donc égale à 0 dès que batch_size > 1 — le gradient
+// moyen du batch est alors annulé au lieu d'être moyenné. Utiliser
+// `1.0f/batch_size` corrigerait ce calcul sans changer le reste de la logique.
 void batch_training(int debut,int batch_size,data* nourriture,matrice** obj, int N,neural_network* reseau,pile* p){
     pthread_t threads[batch_size];
     pthread_mutex_t mutex_pile;
@@ -727,6 +790,9 @@ void batch_training(int debut,int batch_size,data* nourriture,matrice** obj, int
     printf("fin batch\n");
 }
 
+// Duplique entièrement un réseau (poids, biais, gradients, activations...)
+// par copie profonde de chaque matrice (copy_new). Utilisé pour donner à
+// chaque thread de batch_training sa propre copie indépendante du réseau.
 neural_network* copy_neural_network(neural_network* reseau) {
     if (reseau == NULL) {
         fprintf(stderr, "Erreur: réseau source est NULL\n");
@@ -786,6 +852,8 @@ neural_network* copy_neural_network(neural_network* reseau) {
     return res;
 }
 
+// Libère toute la mémoire (CPU et GPU) associée au réseau : matrices
+// poids/biais/gradients/activations puis la structure elle-même.
 void liberer_reseau(neural_network* reseau){
     free(reseau->neuronnes_parcouche);
     for (int i = 0; i < reseau->nombre_couche; i++) {

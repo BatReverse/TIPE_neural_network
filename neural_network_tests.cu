@@ -1,3 +1,9 @@
+// neural_network_tests.cu — Scénarios de test/entraînement manuels : XOR
+// (petit cas jouet pour valider la rétropropagation), et plusieurs variantes
+// d'entraînement sur MNIST (SGD, Adam, par batch multi-threads). C'est ici
+// que se trouve la logique "expérience" appelée depuis main.cu ; il n'y a
+// pas de framework de test automatisé, chaque fonction s'exécute et affiche
+// ses résultats sur stdout.
 #include"neural_network.h"
 #include"matrice.h"
 #include<stdio.h>
@@ -9,6 +15,8 @@
 #include<stdlib.h>
 #include<unistd.h>
 
+// Affiche "indice:valeur" pour chaque case du tableau, séparés par des
+// virgules (utilisé pour afficher le nombre de bonnes réponses par chiffre).
 void afficher_tableau(int* tableau, int taille) {
     for (int i = 0; i < taille; i++) {
         printf("%d:%d", i, tableau[i]); // Affiche l'indice et la valeur
@@ -20,6 +28,8 @@ void afficher_tableau(int* tableau, int taille) {
 }
 
 
+// Construit les 4 entrées possibles du XOR : (0,0), (1,1), (0,1), (1,0),
+// chacune sous forme de vecteur colonne de taille 2 sur le GPU.
 matrice** creationressources_xor(){
     matrice** ressources = (matrice**)malloc(sizeof(matrice*)*4);
 
@@ -77,6 +87,8 @@ matrice** creationressources_xor(){
 }
 
 
+// Construit les sorties attendues correspondant à creationressources_xor() :
+// XOR(0,0)=0, XOR(1,1)=0, XOR(0,1)=1, XOR(1,0)=1.
 matrice** creationtests_xor() {
     matrice** tests = (matrice**)malloc(sizeof(matrice*) * 4);
 
@@ -112,6 +124,9 @@ matrice** creationtests_xor() {
     return tests;
 }
 
+// Mesure grossièrement le temps de propagation avant sur 5000 images MNIST
+// (pas d'entraînement : la ligne de rétropropagation est commentée), pour
+// comparer le coût du forward seul à celui du forward+backward.
 int test_perf(){
     data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
     data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
@@ -129,6 +144,10 @@ int test_perf(){
     return 0.;
 }
 
+// Entraîne un petit réseau (2 -> 4 -> 1) sur le problème XOR par SGD
+// classique : cas jouet qui sert à vérifier que la rétropropagation
+// converge, avant de passer à MNIST. Affiche le MSE toutes les 10000
+// itérations sur un total d'un million d'itérations.
 void test_xor(){
     neural_network* reseau = cree_reseau(3,2,4,1);
     matrice** ressources = creationressources_xor();
@@ -165,6 +184,8 @@ void test_xor(){
     }
 }
 
+// Vérifie "à la main" le résultat de dCOST() sur un petit exemple numérique
+// (voir le commentaire dans le corps pour le résultat attendu).
 void testdCost(){
 
     float* res_h = (float*)malloc(sizeof(float)*3);
@@ -206,12 +227,17 @@ void testdCost(){
     print_mat(C);
 }
 
+// Vérifie visuellement (print_mat) qu'une matrice aléatoire et sa
+// transposée correspondent bien.
 void testtranspose(){
     matrice* A = random_mat(5,1,10);
     print_mat(transpose(A));
     print_mat(A);
 }
 
+// Mélange aléatoirement (Fisher-Yates) le tableau d'exemples d'entraînement
+// entre deux générations (époques), pour éviter que le réseau n'apprenne un
+// ordre particulier.
 void melange_Fisher(data* tab,int N){
     // Parcours du tableau de la fin au début
     for (int i = N-1; i > 0; i--)
@@ -224,6 +250,10 @@ void melange_Fisher(data* tab,int N){
     
 }
 
+// Entraîne un grand réseau (784 -> 2500 -> 2000 -> 1500 -> 1000 -> 500 -> 10)
+// sur MNIST par SGD classique (propagation_arriere, sans optimiseur), sur 2
+// générations (époques). Affiche à chaque génération le MSE, le taux de
+// réussite global et par chiffre sur le jeu de test.
 float train_and_test_MNIST(){
     data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
     data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
@@ -267,6 +297,8 @@ float train_and_test_MNIST(){
     return 0.;
 }
 
+// Alloue simplement trois matrices aléatoires et les affiche (ne teste pas
+// réellement dot_par malgré son nom).
 void testdot(){
     matrice* A =random_mat(3,3,1);
     matrice* B =random_mat(3,3,1);
@@ -276,17 +308,22 @@ void testdot(){
     print_mat(C);
 }
 
+// Vérifie que le chargement du jeu de test MNIST fonctionne en affichant
+// l'image n°5 en ASCII.
 void testMNISTinit(){
     data_set* t_labels= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
 
     print_image(t_labels,5);
 }
 
+// Vérifie que save_neural_network() ne plante pas sur un petit réseau non entraîné.
 void test_nnsave(){
     neural_network* reseau = cree_reseau(3,50,800,10);
     save_neural_network(reseau,"salut.nn");
     return;
 }
+// Vérifie l'aller-retour sauvegarde/chargement : sauvegarde un réseau,
+// le recharge avec importer(), puis le resauvegarde pour comparaison manuelle.
 void test_impnn(){
     neural_network* reseau = cree_reseau(3,50,800,10);
     save_neural_network(reseau,"salut.nn");
@@ -295,6 +332,11 @@ void test_impnn(){
 
 }
 
+// Entraîne un réseau 784 -> 800 -> 10 sur MNIST avec l'optimiseur Adam
+// (learning rate 0.001), indéfiniment (boucle infinie). Sauvegarde le réseau
+// dans "mnistDNN.nn" au début de chaque génération et affiche le MSE et le
+// taux de réussite (global + par chiffre) sur le jeu de test. C'est la
+// fonction appelée par défaut depuis main().
 float train_and_test_MNIST_opt(){
 
     data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
@@ -339,6 +381,11 @@ float train_and_test_MNIST_opt(){
     return 0.;
 }
 
+// Variante par batch de l'entraînement MNIST : maintient une pile de
+// THREAD_MAX copies du réseau, et traite les exemples par groupes de
+// `batch_size` en parallèle (batch_training) avant chaque mise à jour Adam.
+// Voir le commentaire sur batch_training() dans neural_network.cu pour un
+// bug connu (division entière) affectant le gradient moyen du batch.
 void train_and_test_MNIST_batch(){
     data_set* t_test= init("./MNIST_dataset/t10k-images-idx3-ubyte","./MNIST_dataset/t10k-labels-idx1-ubyte",true);
     data_set* t_train= init("./MNIST_dataset/train-images-idx3-ubyte","./MNIST_dataset/train-labels-idx1-ubyte",true);
@@ -392,6 +439,8 @@ void train_and_test_MNIST_batch(){
     }
 }
 
+// Vérifie que copy_neural_network() produit bien un réseau utilisable, en
+// sauvegardant l'original puis la copie et en comparant les deux fichiers.
 void test_copy_neural_network(){
     neural_network* reseau = cree_reseau(4,50,80,80,10);
     printf("aa\n");

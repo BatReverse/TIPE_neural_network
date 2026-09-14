@@ -1,7 +1,9 @@
+// Pile.cu — Implémentation de la pile chaînée de réseaux (voir Pile.h).
 #include"Pile.h"
 #include"matrice.h"
 #include"assert.h"
 
+// Empile `reseau` en tête de pile.
 void empiler(pile** p, neural_network* reseau) {
     pile* res = (pile*)malloc(sizeof(pile));
     res->val = reseau;
@@ -9,6 +11,7 @@ void empiler(pile** p, neural_network* reseau) {
     *p = res;        // Met à jour la tête de pile
 }
 
+// Retire et renvoie le réseau en tête de pile.
 neural_network* pop(pile** p) {  // Passage par adresse pour modifier la pile
     assert(p != NULL && *p != NULL);  // Vérifie que la pile existe et n'est pas vide
 
@@ -18,6 +21,7 @@ neural_network* pop(pile** p) {  // Passage par adresse pour modifier la pile
 
     return res;
 }
+// Libère toute la pile ainsi que chaque réseau qu'elle contient.
 void liberer_pile(pile* p) {
     while (p != NULL) {
         pile* suivant = p->next;  
@@ -30,6 +34,8 @@ void liberer_pile(pile* p) {
     }
 }
 
+// Copie `poids`/`biais` dans les poids/biais d'un seul réseau (fonction
+// interne à update_pile ; non déclarée dans Pile.h).
 void update_reseau(neural_network* reseau,matrice** poids,matrice** biais){
     for (int i = 0; i < reseau->nombre_couche-1; i++)
     {
@@ -38,6 +44,7 @@ void update_reseau(neural_network* reseau,matrice** poids,matrice** biais){
     }
 }
 
+// Recopie `poids`/`biais` dans chaque réseau de la pile `p`.
 void update_pile(pile* p, matrice** poids, matrice** biais){
     pile* tmp = p;
     while (tmp != NULL)

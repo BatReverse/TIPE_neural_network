@@ -1,3 +1,8 @@
+// MNIST_manager.cu — Implémentation du chargement et de l'affichage du
+// jeu de données MNIST (voir MNIST_manager.h). Format des fichiers IDX :
+// un en-tête de 4 entiers 32 bits big-endian (magic number, nombre
+// d'images, lignes, colonnes pour les images ; magic number puis nombre de
+// labels pour les labels), suivi des octets de données bruts.
 #include<stdbool.h>
 #include<stdio.h>
 #include"matrice.h"
@@ -7,6 +12,8 @@
 #include <unistd.h>
 #include"MNIST_manager.h"
 
+// Affiche en ASCII (dans le terminal) la k-ième image du jeu de données `d`,
+// en associant un caractère à chaque niveau de gris (debug/visualisation).
 void print_image(data_set* d,int k) {
     if (d == NULL || d->cur_data == NULL || d->cur_data->data->data == NULL) {
         printf("Aucune image disponible à afficher.\n");
@@ -44,6 +51,9 @@ void print_image(data_set* d,int k) {
     printf("label: %d \n",d->cur_data[k].label);
 }
 
+// Charge en une fois toutes les images (et leur label) du jeu de données `d`
+// depuis les fichiers ouverts par init(), et les copie sur le GPU. Chaque
+// image est aplatie en un vecteur colonne de n*m pixels.
 void get_image_array(data_set* d){
     int n=d->lignes;
     int m=d->colonnes;
@@ -65,9 +75,12 @@ void get_image_array(data_set* d){
     d->cur_data=c;
 }
 
+// Lit une image et son label supplémentaires depuis les fichiers encore
+// ouverts de `d` (non utilisé par le flux d'entraînement principal, qui
+// charge tout via get_image_array ; conservé pour un usage ponctuel/debug).
 void get_next(data_set* d){
     if(!(d->fimages)){
-        printf("ahhh");
+        printf("Erreur : get_next() appelé alors que le fichier d'images n'est pas ouvert.\n");
         exit(EXIT_FAILURE);
     };
     int colonnes = d->cur_data->data->colonnes;
@@ -83,6 +96,9 @@ void get_next(data_set* d){
     printf("%d",(d->cur_data)->label);
 }
 
+// Ouvre les fichiers IDX d'images et de labels, lit leurs en-têtes (magic
+// number, dimensions...) puis charge tout le jeu de données sur le GPU via
+// get_image_array(). Termine le programme (exit) si un fichier est manquant.
 data_set* init(char* images_n,char* labels_n, bool is_training){
     FILE* images;
     data_set* res = (data_set*)malloc(sizeof(data_set));
@@ -148,10 +164,15 @@ data_set* init(char* images_n,char* labels_n, bool is_training){
     }
 
 
+    // ATTENTION (bug existant, non corrigé ici) : le magic number du
+    // fichier de labels est lu dans la variable `magic_number` (celle des
+    // images, déjà utilisée plus haut) au lieu de `magic_number_labels`.
+    // Cette dernière reste donc toujours à 0 ci-dessous. Sans conséquence
+    // pratique : magic_number_labels n'est jamais relu ailleurs.
     int32_t magic_number_labels = 0u;
 
     magic_number |= getc(labels)<<24;
-    magic_number |= getc(labels)<<16; 
+    magic_number |= getc(labels)<<16;
     magic_number |= getc(labels)<<8;
     magic_number |= getc(labels);
 
@@ -172,6 +193,9 @@ data_set* init(char* images_n,char* labels_n, bool is_training){
     return res;
 }
 
+// Construit les n vecteurs "one-hot" de taille n (le i-ème vaut 1 à
+// l'indice i et 0 ailleurs), utilisés comme sortie attendue du réseau
+// pendant l'entraînement (n=10 pour les 10 chiffres de MNIST).
 matrice** get_obj(int n){
     matrice** res = (matrice**)malloc(sizeof(matrice*)*n);
     for(int i=0;i<n;i++){
@@ -189,13 +213,18 @@ matrice** get_obj(int n){
     return res;
 }
 
+// Exemple d'utilisation autonome de ce fichier (désactivé : ce projet
+// compile MNIST_manager.cu comme un module du programme principal, avec un
+// seul main() dans main.cu — voir train_and_test_MNIST_opt() dans
+// neural_network_tests.cu pour l'usage réel de init()/print_image()) :
+//
 // int main(int argc, char const *argv[])
 // {
 //     data_set* a = init("MNIST_dataset/t10k-images-idx3-ubyte",
 //         "MNIST_dataset/t10k-labels-idx1-ubyte",
 //         true);
-
+//
 //     print_image(a,10);
-
+//
 //     return 0;
 // }
