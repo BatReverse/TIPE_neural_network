@@ -137,27 +137,3 @@ Ils sont signalés par des commentaires `ATTENTION` ou `TODO` dans le code :
   d'origine (observations sur Adam, pistes non terminées), conservées pour
   mémoire.
 
-## Ce qui n'a pas été touché
-
-À la demande explicite du propriétaire du projet, ce nettoyage s'est limité
-à la forme (organisation, commentaires, suppression de code mort/`printf`
-de debug oubliés, `.gitignore`) : **aucune logique de calcul, d'algorithme
-ou de performance n'a été modifiée**. Les bugs listés ci-dessus sont donc
-toujours présents et fonctionnent (ou pas) exactement comme avant.
-
-## Nettoyage effectué sur le dépôt
-
-- Ajout d'un `.gitignore` (binaire compilé, fichiers `.o`, fichiers
-  temporaires d'éditeur).
-- Le binaire compilé `main` a été retiré du suivi git (il reste généré
-  localement par `makemain.sh`).
-- Suppression des fichiers dupliqués `MNIST_dataset/train-images.idx3-ubyte`
-  et `MNIST_dataset/train-labels.idx1-ubyte` (identiques aux fichiers
-  `train-images-idx3-ubyte` / `train-labels-idx1-ubyte` réellement utilisés
-  par le code).
-- Suppression de quelques fonctions de test mortes/vides dans `main.cu`
-  (`goofytest`, `neural_test`, jamais appelées) et de blocs de code commenté
-  obsolètes.
-- Remplacement de quelques messages de debug peu clairs (`"fdp"`,
-  `"aaaaaa"`, `"ahhh"`) par des messages d'erreur explicites, sans changer le
-  comportement du programme.
