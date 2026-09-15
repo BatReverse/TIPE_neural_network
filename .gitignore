@@ -1,0 +1,7 @@
+# Binaire compilé (généré par makemain.sh)
+main
+*.o
+
+# Fichiers temporaires d'éditeur
+*~
+*.swp
